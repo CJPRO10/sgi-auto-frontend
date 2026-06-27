@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Dashboard from '../../pages/dashboard/Dashboard'
 import Placeholder from '../ui/Placeholder'
+import Clientes from '../../pages/clientes/Clientes'
 
 export default function Layout() {
   return (
@@ -9,6 +10,7 @@ export default function Layout() {
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <Routes>
+          <Route path="/clientes" element={<Clientes />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pos" element={<Placeholder titulo="Punto de Venta" />} />
