@@ -1,0 +1,146 @@
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { crearProducto, actualizarProducto, getCategorias } from '../../api/inventario'
+import { X } from 'lucide-react'
+
+export default function ModalProducto({ producto, onClose, onSuccess }) {
+  const esEdicion = !!producto
+
+  const [form, setForm] = useState({
+    nombre: producto?.nombre || '',
+    codigo: producto?.codigo || '',
+    descripcion: producto?.descripcion || '',
+    categoriaId: producto?.categoriaId || '',
+    precioCompraConIva: producto?.precioCompraConIva || '',
+    precioVentaDetal: producto?.precioVentaDetal || '',
+    stockActual: producto?.stockActual || 0,
+    stockMinimo: producto?.stockMinimo || 5,
+    unidadMedida: producto?.unidadMedida || 'UNIDAD',
+    mostrarEnListaPrecios: producto?.mostrarEnListaPrecios || false,
+  })
+
+  const [error, setError] = useState('')
+
+  const { data: categoriasData } = useQuery({
+    queryKey: ['categorias'],
+    queryFn: () => getCategorias().then((r) => r.data.datos),
+  })
+
+  const categorias = categoriasData?.content || categoriasData || []
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: (datos) =>
+      esEdicion ? actualizarProducto(producto.id, datos) : crearProducto(datos),
+    onSuccess,
+    onError: (err) => {
+      setError(err.response?.data?.mensaje || 'Error al guardar el producto')
+    },
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    setError('')
+    if (!form.nombre || !form.codigo || !form.precioVentaDetal) {
+      setError('Nombre, código y precio de venta detal son obligatorios')
+      return
+    }
+    mutate({
+        ...form,
+        categoriaId: form.categoriaId ? Number(form.categoriaId) : null,
+        precioCompraConIva: Number(form.precioCompraConIva),
+        precioVentaCop: Number(form.precioVentaDetal),
+        stockActual: Number(form.stockActual),
+        stockMinimo: Number(form.stockMinimo),
+    })
+  }
+
+  const campo = (label, name, type = 'text') => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <input
+        type={type}
+        value={form[name]}
+        onChange={(e) => setForm({ ...form, [name]: e.target.value })}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {esEdicion ? 'Editar producto' : 'Nuevo producto'}
+          </h2>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {campo('Nombre', 'nombre')}
+          <div className="grid grid-cols-2 gap-3">
+            {campo('Código', 'codigo')}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+              <select
+                value={form.categoriaId}
+                onChange={(e) => setForm({ ...form, categoriaId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sin categoría</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {campo('Descripción', 'descripcion')}
+          <div className="grid grid-cols-2 gap-3">
+            {campo('Precio de compra (COP)', 'precioCompraConIva', 'number')}
+            {campo('Precio de venta (COP)', 'precioVentaDetal', 'number')}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {campo('Stock inicial', 'stockActual', 'number')}
+            {campo('Stock mínimo', 'stockMinimo', 'number')}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="mostrarEnListaPrecios"
+              checked={form.mostrarEnListaPrecios}
+              onChange={(e) => setForm({ ...form, mostrarEnListaPrecios: e.target.checked })}
+              className="rounded"
+            />
+            <label htmlFor="mostrarEnListaPrecios" className="text-sm text-gray-700">
+              Mostrar en lista de precios
+            </label>
+          </div>
+
+          {error && (
+            <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+            >
+              {isPending ? 'Guardando...' : esEdicion ? 'Actualizar' : 'Crear producto'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
