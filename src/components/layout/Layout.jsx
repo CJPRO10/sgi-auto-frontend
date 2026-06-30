@@ -4,6 +4,7 @@ import Dashboard from '../../pages/dashboard/Dashboard'
 import Placeholder from '../ui/Placeholder'
 import Clientes from '../../pages/clientes/Clientes'
 import Inventario from '../../pages/inventario/Inventario'
+import Taller from '../../pages/taller/Taller'
 
 export default function Layout() {
   return (
@@ -17,7 +18,7 @@ export default function Layout() {
           <Route path="/pos" element={<Placeholder titulo="Punto de Venta" />} />
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/clientes" element={<Placeholder titulo="Clientes" />} />
-          <Route path="/taller" element={<Placeholder titulo="Taller" />} />
+          <Route path="/taller" element={<Taller />} />
           <Route path="/caja" element={<Placeholder titulo="Caja" />} />
           <Route path="/reportes" element={<Placeholder titulo="Reportes" />} />
         </Routes>
