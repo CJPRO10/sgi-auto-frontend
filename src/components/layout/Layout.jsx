@@ -5,6 +5,7 @@ import Placeholder from '../ui/Placeholder'
 import Clientes from '../../pages/clientes/Clientes'
 import Inventario from '../../pages/inventario/Inventario'
 import Taller from '../../pages/taller/Taller'
+import Pos from '../../pages/pos/Pos'
 
 export default function Layout() {
   return (
@@ -15,7 +16,7 @@ export default function Layout() {
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/pos" element={<Placeholder titulo="Punto de Venta" />} />
+          <Route path="/pos" element={<Pos />} />
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/clientes" element={<Placeholder titulo="Clientes" />} />
           <Route path="/taller" element={<Taller />} />
