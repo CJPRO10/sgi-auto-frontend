@@ -17,3 +17,11 @@ export const actualizarCliente = (id, datos) =>
 
 export const eliminarCliente = (id) =>
   api.delete(`/clientes/${id}`)
+export const getCreditoCliente = (id) =>
+  api.get(`/clientes/${id}/credito`)
+
+export const registrarAbono = (id, datos) =>
+  api.post(`/clientes/${id}/credito/pagos`, datos)
+
+export const agregarDeuda = (id, datos) =>
+  api.post(`/clientes/${id}/credito/deuda`, datos)
