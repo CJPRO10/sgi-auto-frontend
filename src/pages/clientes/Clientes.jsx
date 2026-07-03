@@ -4,6 +4,7 @@ import { getClientes, buscarClientes, eliminarCliente } from '../../api/clientes
 import { formatCOP } from '../../utils/formato'
 import { Search, Plus, Trash2, Edit2, Star, CreditCard, AlertTriangle } from 'lucide-react'
 import ModalCrearCliente from './ModalCrearCliente'
+import ModalCredito from './ModalCredito'
 
 export default function Clientes() {
   const queryClient = useQueryClient()
@@ -11,6 +12,7 @@ export default function Clientes() {
   const [pagina, setPagina] = useState(0)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [clienteEditando, setClienteEditando] = useState(null)
+  const [clienteCredito, setClienteCredito] = useState(null)
 
   const { data, isLoading } = useQuery({
     queryKey: busqueda.length >= 2
@@ -127,12 +129,15 @@ export default function Clientes() {
                   </td>
                   <td className="px-6 py-4">
                     {c.creditoHabilitado ? (
-                      <div className="flex items-center gap-1 text-sm">
+                      <button
+                        onClick={() => setClienteCredito(c)}
+                        className="flex items-center gap-1 text-sm hover:underline"
+                      >
                         <CreditCard size={14} className="text-green-500" />
                         <span className="text-green-700 font-medium">
                           {formatCOP(c.cupoCreditoCop)}
                         </span>
-                      </div>
+                      </button>
                     ) : (
                       <span className="text-xs text-gray-400">Sin crédito</span>
                     )}
@@ -184,6 +189,12 @@ export default function Clientes() {
       )}
 
       {/* Modal */}
+      {clienteCredito && (
+        <ModalCredito
+          cliente={clienteCredito}
+          onClose={() => setClienteCredito(null)}
+        />
+      )}
       {modalAbierto && (
         <ModalCrearCliente
           cliente={clienteEditando}

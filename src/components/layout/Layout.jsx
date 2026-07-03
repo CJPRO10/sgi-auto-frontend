@@ -6,6 +6,7 @@ import Clientes from '../../pages/clientes/Clientes'
 import Inventario from '../../pages/inventario/Inventario'
 import Taller from '../../pages/taller/Taller'
 import Pos from '../../pages/pos/Pos'
+import Caja from '../../pages/caja/Caja'
 
 export default function Layout() {
   return (
@@ -20,7 +21,7 @@ export default function Layout() {
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/clientes" element={<Placeholder titulo="Clientes" />} />
           <Route path="/taller" element={<Taller />} />
-          <Route path="/caja" element={<Placeholder titulo="Caja" />} />
+          <Route path="/caja" element={<Caja />} />
           <Route path="/reportes" element={<Placeholder titulo="Reportes" />} />
         </Routes>
       </main>
