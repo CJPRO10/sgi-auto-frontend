@@ -12,7 +12,7 @@ import {
   Car,
 } from 'lucide-react'
 
-const navItems = [
+const NAV_DUENO = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/pos', icon: ShoppingCart, label: 'Punto de Venta' },
   { to: '/inventario', icon: Package, label: 'Inventario' },
@@ -20,11 +20,20 @@ const navItems = [
   { to: '/taller', icon: Wrench, label: 'Taller' },
   { to: '/caja', icon: DollarSign, label: 'Caja' },
   { to: '/reportes', icon: BarChart3, label: 'Reportes' },
+  { to: '/usuarios', icon: Users, label: 'Usuarios' },
+]
+
+const NAV_MECANICO = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/taller', icon: Wrench, label: 'Taller' },
 ]
 
 export default function Sidebar() {
   const { usuario, logout } = useAuthStore()
   const navigate = useNavigate()
+
+  const esMecanico = usuario?.rol === 'MECANICO'
+  const navItems = esMecanico ? NAV_MECANICO : NAV_DUENO
 
   const handleLogout = () => {
     logout()
@@ -33,7 +42,6 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 bg-gray-900 text-white flex flex-col">
-      {/* Logo */}
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 p-2 rounded-lg">
@@ -46,7 +54,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Navegación */}
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
@@ -66,7 +73,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Usuario + logout */}
       <div className="p-4 border-t border-gray-700">
         <div className="mb-3 px-3">
           <p className="text-sm font-medium truncate">

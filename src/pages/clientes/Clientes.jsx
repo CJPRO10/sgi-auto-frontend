@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getClientes, buscarClientes, eliminarCliente } from '../../api/clientes'
 import { formatCOP } from '../../utils/formato'
-import { Search, Plus, Trash2, Edit2, Star, CreditCard, AlertTriangle } from 'lucide-react'
+import { Search, Plus, Trash2, Edit2, Star, CreditCard, AlertTriangle, Eye } from 'lucide-react'
 import ModalCrearCliente from './ModalCrearCliente'
 import ModalCredito from './ModalCredito'
 
@@ -131,12 +131,13 @@ export default function Clientes() {
                     {c.creditoHabilitado ? (
                       <button
                         onClick={() => setClienteCredito(c)}
-                        className="flex items-center gap-1 text-sm hover:underline"
+                        className="flex items-center gap-2 text-sm group"
                       >
                         <CreditCard size={14} className="text-green-500" />
                         <span className="text-green-700 font-medium">
                           {formatCOP(c.cupoCreditoCop)}
                         </span>
+                        <Eye size={13} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
                       </button>
                     ) : (
                       <span className="text-xs text-gray-400">Sin crédito</span>

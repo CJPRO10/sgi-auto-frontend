@@ -21,27 +21,23 @@ function generarUUID() {
 export default function Pos() {
   const queryClient = useQueryClient()
 
-  // Productos
   const [busqueda, setBusqueda] = useState('')
   const debouncedBusqueda = useDebounce(busqueda, 400)
 
-  // Carrito
   const [carrito, setCarrito] = useState([])
 
-  // Cliente
   const [busquedaCliente, setBusquedaCliente] = useState('')
   const [clienteEncontrado, setClienteEncontrado] = useState(null)
   const debouncedCliente = useDebounce(busquedaCliente, 300)
 
-  // Pago
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
-  const [montoPagado, setMontoPagado] = useState('')
+  const [montoEfectivo, setMontoEfectivo] = useState('')
+  const [montoTransferencia, setMontoTransferencia] = useState('')
+  const [montoCredito, setMontoCredito] = useState('')
 
-  // UI
   const [mensajeExito, setMensajeExito] = useState(null)
   const [error, setError] = useState('')
 
-  // Query productos
   const { data: productosData } = useQuery({
     queryKey: debouncedBusqueda.length >= 2
       ? ['productos-busqueda', debouncedBusqueda]
@@ -53,14 +49,13 @@ export default function Pos() {
   })
   const productos = productosData || []
 
-  // Query búsqueda de cliente
   const { data: clientesSugeridosData } = useQuery({
     queryKey: ['clientes-busqueda-pos', debouncedCliente],
     queryFn: () =>
       debouncedCliente.length >= 2
         ? buscarClientes(debouncedCliente).then((r) => r.data.datos)
         : Promise.resolve([]),
-    enabled: debouncedCliente.length >= 2 && !clienteEncontrado,
+    enabled: Boolean(debouncedCliente.length >= 2 && !clienteEncontrado),
   })
   const clientesSugeridos = clientesSugeridosData || []
 
@@ -69,6 +64,11 @@ export default function Pos() {
     [carrito]
   )
 
+  const totalMixto = Number(montoEfectivo || 0) + Number(montoTransferencia || 0) + Number(montoCredito || 0)
+  const vuelto = metodoPago === 'EFECTIVO' && montoEfectivo
+    ? Number(montoEfectivo) - subtotal
+    : 0
+
   const { mutate: registrarVenta, isPending } = useMutation({
     mutationFn: crearVenta,
     onSuccess: (res) => {
@@ -76,7 +76,9 @@ export default function Pos() {
       setCarrito([])
       setClienteEncontrado(null)
       setBusquedaCliente('')
-      setMontoPagado('')
+      setMontoEfectivo('')
+      setMontoTransferencia('')
+      setMontoCredito('')
       setError('')
       queryClient.invalidateQueries(['productos'])
       queryClient.invalidateQueries(['dashboard'])
@@ -129,12 +131,26 @@ export default function Pos() {
       setError('Agrega al menos un producto')
       return
     }
+    if (metodoPago === 'EFECTIVO' && montoEfectivo && Number(montoEfectivo) < subtotal) {
+      setError(`Faltan ${formatCOP(subtotal - Number(montoEfectivo))} para completar el pago`)
+      return
+    }
+    if (metodoPago === 'MIXTO' && totalMixto < subtotal) {
+      setError(`Faltan ${formatCOP(subtotal - totalMixto)} para completar el pago`)
+      return
+    }
+
     registrarVenta({
       claveIdempotencia: generarUUID(),
       clienteId: clienteEncontrado ? clienteEncontrado.id : null,
       nombreClienteAnonimo: clienteEncontrado ? null : 'Cliente general',
       metodoPago,
-      montoPagadoCop: montoPagado ? Number(montoPagado) : subtotal,
+      montoPagadoCop: metodoPago === 'EFECTIVO'
+        ? (montoEfectivo ? Number(montoEfectivo) : subtotal)
+        : subtotal,
+      montoEfectivoCop: Number(montoEfectivo) || 0,
+      montoTransferenciaCop: Number(montoTransferencia) || 0,
+      montoCreditoCop: Number(montoCredito) || 0,
       items: carrito.map((i) => ({
         productoId: i.productoId,
         cantidad: i.cantidad,
@@ -145,10 +161,9 @@ export default function Pos() {
 
   return (
     <div className="flex h-full">
-      {/* Columna izquierda: productos */}
+      {/* Columna izquierda */}
       <div className="flex-1 p-6 overflow-y-auto">
         <h1 className="text-2xl font-bold text-gray-800 mb-4">Punto de Venta</h1>
-
         <div className="relative mb-4">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -159,7 +174,6 @@ export default function Pos() {
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {productos.map((p) => (
             <button
@@ -191,7 +205,6 @@ export default function Pos() {
           </div>
         </div>
 
-        {/* Items del carrito */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {carrito.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-8">Carrito vacío</p>
@@ -229,10 +242,8 @@ export default function Pos() {
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t space-y-3">
-
-          {/* Búsqueda de cliente */}
+          {/* Búsqueda cliente */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Buscar cliente (nombre o cédula)
@@ -244,14 +255,11 @@ export default function Pos() {
                 value={busquedaCliente}
                 onChange={(e) => {
                   setBusquedaCliente(e.target.value)
-                  if (!e.target.value) {
-                    setClienteEncontrado(null)
-                  }
+                  if (!e.target.value) setClienteEncontrado(null)
                 }}
                 disabled={!!clienteEncontrado}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               />
-              {/* Dropdown sugerencias */}
               {clientesSugeridos.length > 0 && !clienteEncontrado && (
                 <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
                   {clientesSugeridos.map((c) => (
@@ -264,9 +272,7 @@ export default function Pos() {
                       className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0"
                     >
                       <p className="font-medium">{c.nombreCompleto}</p>
-                      <p className="text-xs text-gray-400">
-                        {c.tipoIdentificacion} {c.numeroIdentificacion}
-                      </p>
+                      <p className="text-xs text-gray-400">{c.tipoIdentificacion} {c.numeroIdentificacion}</p>
                     </button>
                   ))}
                 </div>
@@ -274,7 +280,6 @@ export default function Pos() {
             </div>
           </div>
 
-          {/* Cliente seleccionado */}
           {clienteEncontrado ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
@@ -284,13 +289,8 @@ export default function Pos() {
                     ⭐ {clienteEncontrado.saldoPuntos} puntos — {clienteEncontrado.tipoIdentificacion} {clienteEncontrado.numeroIdentificacion}
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    setClienteEncontrado(null)
-                    setBusquedaCliente('')
-                  }}
-                  className="text-blue-400 hover:text-blue-600 ml-2"
-                >
+                <button onClick={() => { setClienteEncontrado(null); setBusquedaCliente('') }}
+                  className="text-blue-400 hover:text-blue-600 ml-2">
                   <X size={14} />
                 </button>
               </div>
@@ -304,7 +304,12 @@ export default function Pos() {
             <label className="block text-xs font-medium text-gray-600 mb-1">Método de pago</label>
             <select
               value={metodoPago}
-              onChange={(e) => setMetodoPago(e.target.value)}
+              onChange={(e) => {
+                setMetodoPago(e.target.value)
+                setMontoEfectivo('')
+                setMontoTransferencia('')
+                setMontoCredito('')
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {METODOS_PAGO.map((m) => (
@@ -313,19 +318,67 @@ export default function Pos() {
             </select>
           </div>
 
-          {/* Monto pagado */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Monto pagado (opcional)
-            </label>
-            <input
-              type="number"
-              placeholder={String(subtotal)}
-              value={montoPagado}
-              onChange={(e) => setMontoPagado(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          {/* Efectivo */}
+          {metodoPago === 'EFECTIVO' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Monto recibido</label>
+              <input
+                type="number"
+                placeholder={String(subtotal)}
+                value={montoEfectivo}
+                onChange={(e) => setMontoEfectivo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {montoEfectivo && vuelto > 0 && (
+                <div className="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+                  <span className="text-sm font-medium text-green-700">Vuelto</span>
+                  <span className="text-lg font-bold text-green-700">{formatCOP(vuelto)}</span>
+                </div>
+              )}
+              {montoEfectivo && vuelto < 0 && (
+                <div className="flex justify-between items-center bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">
+                  <span className="text-sm font-medium text-red-700">Falta</span>
+                  <span className="text-lg font-bold text-red-700">{formatCOP(Math.abs(vuelto))}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mixto */}
+          {metodoPago === 'MIXTO' && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-600">Desglose del pago</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Efectivo</label>
+                <input type="number" placeholder="0" value={montoEfectivo}
+                  onChange={(e) => setMontoEfectivo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Transferencia</label>
+                <input type="number" placeholder="0" value={montoTransferencia}
+                  onChange={(e) => setMontoTransferencia(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Crédito</label>
+                <input type="number" placeholder="0" value={montoCredito}
+                  onChange={(e) => setMontoCredito(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {totalMixto > 0 && (
+                <div className={`flex justify-between text-xs px-2 py-1.5 rounded-lg ${
+                  totalMixto >= subtotal ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  <span>Total ingresado</span>
+                  <span className="font-semibold">{formatCOP(totalMixto)}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Total */}
           <div className="flex justify-between items-center py-2 border-t">
@@ -339,7 +392,12 @@ export default function Pos() {
 
           <button
             onClick={handleCobrar}
-            disabled={isPending || carrito.length === 0}
+            disabled={
+              isPending ||
+              carrito.length === 0 ||
+              (metodoPago === 'EFECTIVO' && montoEfectivo && Number(montoEfectivo) < subtotal) ||
+              (metodoPago === 'MIXTO' && totalMixto > 0 && totalMixto < subtotal)
+            }
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isPending ? 'Procesando...' : 'Cobrar'}
@@ -355,11 +413,13 @@ export default function Pos() {
               <ShoppingCart size={24} className="text-green-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">Venta registrada</h3>
-            <p className="text-gray-500 text-sm mb-4">Total: {formatCOP(mensajeExito.totalCop)}</p>
+            <p className="text-gray-500 text-sm mb-2">Total: {formatCOP(mensajeExito.totalCop)}</p>
             {mensajeExito.vueltoCop > 0 && (
-              <p className="text-gray-700 font-medium mb-4">
-                Vuelto: {formatCOP(mensajeExito.vueltoCop)}
-              </p>
+              <div className="bg-green-50 rounded-lg px-4 py-2 mb-3">
+                <p className="text-green-700 font-bold text-lg">
+                  Vuelto: {formatCOP(mensajeExito.vueltoCop)}
+                </p>
+              </div>
             )}
             {mensajeExito.puntosGanados > 0 && (
               <p className="text-yellow-600 text-sm mb-4">

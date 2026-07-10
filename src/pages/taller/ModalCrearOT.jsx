@@ -3,6 +3,8 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { crearOrden } from '../../api/taller'
 import { getClientes } from '../../api/clientes'
 import { X } from 'lucide-react'
+import { getUsuarios } from '../../api/usuarios'
+import useAuthStore from '../../store/authStore'
 
 export default function ModalCrearOT({ onClose, onSuccess }) {
   const [form, setForm] = useState({
@@ -16,8 +18,18 @@ export default function ModalCrearOT({ onClose, onSuccess }) {
     colorVehiculo: '',
     kilometraje: '',
     descripcionProblema: '',
+    mecanicoId: '',
   })
   const [error, setError] = useState('')
+  const usuario = useAuthStore((s) => s.usuario)
+  const esDueno = usuario?.rol === 'DUENO'
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: () => getUsuarios().then((r) => r.data.datos),
+    enabled: esDueno, // solo cargar si es dueño
+  })
+  const mecanicos = (usuariosData || []).filter(
+    (u) => u.rol === 'MECANICO' && u.estaActivo)
 
   const { data: clientesData } = useQuery({
     queryKey: ['clientes', 0],
@@ -55,6 +67,7 @@ export default function ModalCrearOT({ onClose, onSuccess }) {
     mutate({
       ...form,
       clienteId: form.clienteId ? Number(form.clienteId) : null,
+      mecanicoId: form.mecanicoId ? Number(form.mecanicoId) : null,
       anioVehiculo: form.anioVehiculo ? Number(form.anioVehiculo) : null,
       kilometraje: form.kilometraje ? Number(form.kilometraje) : null,
     })
@@ -135,6 +148,26 @@ export default function ModalCrearOT({ onClose, onSuccess }) {
               />
             </div>
           </div>
+          {esDueno && mecanicos.length > 0 && (
+          <div className="border-t pt-4">
+            <p className="text-sm font-semibold text-gray-600 mb-3">Asignación</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mecánico asignado
+              </label>
+              <select
+                value={form.mecanicoId}
+                onChange={(e) => setForm({ ...form, mecanicoId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sin asignar</option>
+                {mecanicos.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nombreCompleto}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
           {error && (
             <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
