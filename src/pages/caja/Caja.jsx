@@ -151,19 +151,35 @@ export default function Caja() {
       {cajaAbierta && sesion && (
         <>
           {/* Métricas */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'Saldo inicial', valor: sesion.saldoInicialCop, color: 'text-gray-800' },
-              { label: 'Ventas del turno', valor: sesion.totalVentasCop, color: 'text-green-600' },
-              { label: 'Gastos', valor: sesion.totalGastosCop, color: 'text-red-600' },
-              { label: 'Saldo esperado', valor: sesion.saldoEsperadoCop, color: 'text-blue-600' },
+                { label: 'Saldo inicial', valor: sesion.saldoInicialCop, color: 'text-gray-800' },
+                { label: 'Total ventas', valor: sesion.totalVentasCop, color: 'text-green-600' },
+                { label: 'Gastos', valor: sesion.totalGastosCop, color: 'text-red-600' },
+                { label: 'Saldo esperado', valor: sesion.saldoEsperadoCop, color: 'text-blue-600' },
             ].map((m) => (
-              <div key={m.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div key={m.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs text-gray-500 mb-1">{m.label}</p>
                 <p className={`text-xl font-bold ${m.color}`}>{formatCOP(m.valor)}</p>
-              </div>
+                </div>
             ))}
-          </div>
+            </div>
+
+            {/* Desglose por método de pago */}
+            <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">💵 Efectivo</p>
+                <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalEfectivoCop)}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">🏦 Transferencia</p>
+                <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalTransferenciaCop)}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">📋 Crédito</p>
+                <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalCreditoCop)}</p>
+            </div>
+            </div>
 
           {/* Tabs */}
           <div className="flex gap-2 border-b border-gray-200">
