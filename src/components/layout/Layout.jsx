@@ -11,6 +11,7 @@ import Caja from '../../pages/caja/Caja'
 import Reportes from '../../pages/reportes/Reportes'
 import Usuarios from '../../pages/usuarios/Usuarios'
 import useAuthStore from '../../store/authStore'
+import Proveedores from '../../pages/inventario/Proveedor'
 
 export default function Layout() {
   const usuario = useAuthStore((s) => s.usuario)
@@ -30,6 +31,7 @@ export default function Layout() {
           <Route path="/caja" element={<Caja />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/proveedores" element={<Proveedores />} />
         </Routes>
       </main>
     </div>
