@@ -6,6 +6,7 @@ import {
   Search, Plus, Trash2, Edit2, AlertTriangle, Package
 } from 'lucide-react'
 import ModalProducto from './ModalProducto'
+import ModalEntradaMercancia from './ModalEntradaMercancia'
 
 function BadgeStock({ stock, minimo }) {
   if (stock === 0)
@@ -21,6 +22,7 @@ export default function Inventario() {
   const [pagina, setPagina] = useState(0)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditando, setProductoEditando] = useState(null)
+  const [modalEntrada, setModalEntrada] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: busqueda.length >= 2
@@ -63,13 +65,22 @@ export default function Inventario() {
           <h1 className="text-2xl font-bold text-gray-800">Inventario</h1>
           <p className="text-gray-500 text-sm mt-1">Gestión de productos y stock</p>
         </div>
-        <button
-          onClick={handleNuevo}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          Nuevo producto
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setModalEntrada(true)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Entrada mercancía
+          </button>
+          <button
+            onClick={handleNuevo}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Nuevo producto
+          </button>
+        </div>
       </div>
 
       {/* Buscador */}
@@ -195,6 +206,16 @@ export default function Inventario() {
           onClose={() => setModalAbierto(false)}
           onSuccess={() => {
             setModalAbierto(false)
+            queryClient.invalidateQueries(['productos'])
+          }}
+        />
+      )}
+
+      {modalEntrada && (
+        <ModalEntradaMercancia
+          onClose={() => setModalEntrada(false)}
+          onSuccess={() => {
+            setModalEntrada(false)
             queryClient.invalidateQueries(['productos'])
           }}
         />

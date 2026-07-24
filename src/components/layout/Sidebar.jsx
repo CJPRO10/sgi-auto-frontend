@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   Car,
+  Truck,
 } from 'lucide-react'
 
 const NAV_DUENO = [
@@ -21,6 +22,7 @@ const NAV_DUENO = [
   { to: '/caja', icon: DollarSign, label: 'Caja' },
   { to: '/reportes', icon: BarChart3, label: 'Reportes' },
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
+  { to: '/proveedores', icon: Truck, label: 'Proveedores' },
 ]
 
 const NAV_MECANICO = [
