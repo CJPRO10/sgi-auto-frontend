@@ -2,11 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProductos, buscarProductos, eliminarProducto } from '../../api/inventario'
 import { formatCOP } from '../../utils/formato'
-import {
-  Search, Plus, Trash2, Edit2, AlertTriangle, Package
-} from 'lucide-react'
+import { Search, Plus, Trash2, Edit2, AlertTriangle, Package } from 'lucide-react'
 import ModalProducto from './ModalProducto'
-import ModalEntradaMercancia from './ModalEntradaMercancia'
 
 function BadgeStock({ stock, minimo }) {
   if (stock === 0)
@@ -22,7 +19,6 @@ export default function Inventario() {
   const [pagina, setPagina] = useState(0)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditando, setProductoEditando] = useState(null)
-  const [modalEntrada, setModalEntrada] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: busqueda.length >= 2
@@ -54,36 +50,25 @@ export default function Inventario() {
   }
 
   const handleEliminar = (id, nombre) => {
-    if (confirm(`¿Eliminar el producto "${nombre}"?`)) eliminar(id)
+    if (confirm(`¿Desactivar el producto "${nombre}"?`)) eliminar(id)
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Inventario</h1>
           <p className="text-gray-500 text-sm mt-1">Gestión de productos y stock</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setModalEntrada(true)}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={16} />
-            Entrada mercancía
-          </button>
-          <button
-            onClick={handleNuevo}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={16} />
-            Nuevo producto
-          </button>
-        </div>
+        <button
+          onClick={handleNuevo}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          <Plus size={16} />
+          Nuevo producto
+        </button>
       </div>
 
-      {/* Buscador */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -95,7 +80,6 @@ export default function Inventario() {
         />
       </div>
 
-      {/* Tabla */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
@@ -156,16 +140,12 @@ export default function Inventario() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => handleEditar(p)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
+                      <button onClick={() => handleEditar(p)}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                         <Edit2 size={15} />
                       </button>
-                      <button
-                        onClick={() => handleEliminar(p.id, p.nombre)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
+                      <button onClick={() => handleEliminar(p.id, p.nombre)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 size={15} />
                       </button>
                     </div>
@@ -177,24 +157,17 @@ export default function Inventario() {
         )}
       </div>
 
-      {/* Paginación */}
       {!busqueda && totalPaginas > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPagina((p) => Math.max(0, p - 1))}
+          <button onClick={() => setPagina((p) => Math.max(0, p - 1))}
             disabled={pagina === 0}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50"
-          >
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">
             Anterior
           </button>
-          <span className="text-sm text-gray-500">
-            Página {pagina + 1} de {totalPaginas}
-          </span>
-          <button
-            onClick={() => setPagina((p) => Math.min(totalPaginas - 1, p + 1))}
+          <span className="text-sm text-gray-500">Página {pagina + 1} de {totalPaginas}</span>
+          <button onClick={() => setPagina((p) => Math.min(totalPaginas - 1, p + 1))}
             disabled={pagina >= totalPaginas - 1}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50"
-          >
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">
             Siguiente
           </button>
         </div>
@@ -206,16 +179,6 @@ export default function Inventario() {
           onClose={() => setModalAbierto(false)}
           onSuccess={() => {
             setModalAbierto(false)
-            queryClient.invalidateQueries(['productos'])
-          }}
-        />
-      )}
-
-      {modalEntrada && (
-        <ModalEntradaMercancia
-          onClose={() => setModalEntrada(false)}
-          onSuccess={() => {
-            setModalEntrada(false)
             queryClient.invalidateQueries(['productos'])
           }}
         />

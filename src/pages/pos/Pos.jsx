@@ -4,8 +4,10 @@ import { getProductos, buscarProductos } from '../../api/inventario'
 import { buscarClientes } from '../../api/clientes'
 import { crearVenta } from '../../api/pos'
 import { formatCOP } from '../../utils/formato'
-import { Search, Plus, Minus, Trash2, ShoppingCart, X, Package } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, Package, DollarSign } from 'lucide-react'
 import { useDebounce } from '../../hooks/useDebounce'
+import {useNavigate } from 'react-router-dom'
+import useCajaStore from '../../store/cajaStore'
 
 const METODOS_PAGO = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -20,6 +22,9 @@ function generarUUID() {
 
 export default function Pos() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const cajaAbierta = useCajaStore((s) => s.cajaAbierta)
+  const cargandoCaja = useCajaStore((s) => s.cargando)
 
   const [busqueda, setBusqueda] = useState('')
   const debouncedBusqueda = useDebounce(busqueda, 400)
@@ -158,6 +163,33 @@ export default function Pos() {
       })),
     })
   }
+  if (cargandoCaja) return (
+  <div className="flex items-center justify-center h-full">
+    <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+)
+
+  if (!cajaAbierta) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center max-w-sm">
+        <div className="w-14 h-14 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <DollarSign size={24} className="text-yellow-600" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Caja cerrada</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          Debes abrir la caja antes de realizar ventas.
+        </p>
+        <button
+          onClick={() => navigate('/caja')}
+          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+        >
+          Ir a Caja
+        </button>
+      </div>
+    </div>
+  )
+}
 
   return (
     <div className="flex h-full">

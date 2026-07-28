@@ -11,19 +11,22 @@ import Caja from '../../pages/caja/Caja'
 import Reportes from '../../pages/reportes/Reportes'
 import Usuarios from '../../pages/usuarios/Usuarios'
 import useAuthStore from '../../store/authStore'
-import Proveedores from '../../pages/inventario/Proveedor'
+import Compras from '../../pages/compras/Compras'
+import Categorias from '../../pages/inventario/Categorias'
+import DashboardCajera from '../../pages/dashboard/DashboardCajera'
 
 export default function Layout() {
   const usuario = useAuthStore((s) => s.usuario)
   const esMecanico = usuario?.rol === 'MECANICO'
+  const esCajera = usuario?.rol === 'CAJERA'
 
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <Routes>
-          <Route path="/" element={esMecanico ? <DashboardMecanico /> : <Dashboard />} />
-          <Route path="/dashboard" element={esMecanico ? <DashboardMecanico /> : <Dashboard />} />
+          <Route path="/" element={esMecanico ? <DashboardMecanico /> : esCajera ? <DashboardCajera /> : <Dashboard />} />
+          <Route path="/dashboard" element={esMecanico ? <DashboardMecanico /> : esCajera ? <DashboardCajera /> : <Dashboard />} />
           <Route path="/pos" element={<Pos />} />
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/clientes" element={<Clientes />} />
@@ -31,7 +34,8 @@ export default function Layout() {
           <Route path="/caja" element={<Caja />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/usuarios" element={<Usuarios />} />
-          <Route path="/proveedores" element={<Proveedores />} />
+          <Route path="/compras" element={<Compras />} />
+          <Route path="/categorias" element={<Categorias />} />
         </Routes>
       </main>
     </div>

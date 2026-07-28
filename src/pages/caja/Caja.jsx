@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCajaActual, abrirCaja, cerrarCaja, registrarGasto } from '../../api/caja'
 import { formatCOP, formatFecha } from '../../utils/formato'
-import { DollarSign, Plus, Lock, Unlock, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { DollarSign, Lock, Unlock, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import useCajaStore from '../../store/cajaStore'
 
 function FilaMovimiento({ mov }) {
-  const esIngreso = ['VENTA', 'APERTURA', 'ABONO_CREDITO'].includes(mov.tipo)
+  const esIngreso = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA', 'APERTURA', 'ABONO_CREDITO'].includes(mov.tipo)
   return (
     <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
       <div className="flex items-center gap-3">
@@ -16,7 +17,12 @@ function FilaMovimiento({ mov }) {
         </div>
         <div>
           <p className="text-sm font-medium text-gray-700">{mov.descripcion}</p>
-          <p className="text-xs text-gray-400">{formatFecha(mov.creadoEn)}</p>
+          <div className="flex items-center gap-2">
+            {mov.registradoPor && (
+              <p className="text-xs text-blue-500">{mov.registradoPor}</p>
+            )}
+            <p className="text-xs text-gray-400">{formatFecha(mov.creadoEn)}</p>
+          </div>
         </div>
       </div>
       <span className={`text-sm font-semibold ${esIngreso ? 'text-green-600' : 'text-red-600'}`}>
@@ -29,8 +35,6 @@ function FilaMovimiento({ mov }) {
 export default function Caja() {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState('sesion')
-
-  // Formularios
   const [saldoApertura, setSaldoApertura] = useState('')
   const [saldoCierre, setSaldoCierre] = useState('')
   const [notasCierre, setNotasCierre] = useState('')
@@ -38,17 +42,26 @@ export default function Caja() {
   const [descGasto, setDescGasto] = useState('')
   const [error, setError] = useState('')
 
+  const setCajaAbierta = useCajaStore((s) => s.setCajaAbierta)
+
   const { data: cajaData, isLoading, isError } = useQuery({
     queryKey: ['caja-actual'],
-    queryFn: () => getCajaActual().then((r) => r.data.datos),
+    queryFn: () => getCajaActual().then((r) => {
+      const datos = r.data.datos
+      setCajaAbierta(datos?.estaAbierta || false, datos?.id)
+      return datos
+    }),
     retry: false,
+    onError: () => setCajaAbierta(false),
   })
+
   const sesion = cajaData
   const cajaAbierta = sesion?.estaAbierta === true
 
   const { mutate: abrir, isPending: abriendo } = useMutation({
     mutationFn: abrirCaja,
-    onSuccess: () => {
+    onSuccess: (res) => {
+      setCajaAbierta(true, res.data.datos?.id)
       queryClient.invalidateQueries(['caja-actual'])
       queryClient.invalidateQueries(['dashboard'])
       setSaldoApertura('')
@@ -60,6 +73,7 @@ export default function Caja() {
   const { mutate: cerrar, isPending: cerrando } = useMutation({
     mutationFn: cerrarCaja,
     onSuccess: () => {
+      setCajaAbierta(false)
       queryClient.invalidateQueries(['caja-actual'])
       queryClient.invalidateQueries(['dashboard'])
       setSaldoCierre('')
@@ -103,7 +117,6 @@ export default function Caja() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Caja</h1>
@@ -115,8 +128,7 @@ export default function Caja() {
         </div>
       </div>
 
-      {/* Caja cerrada — formulario apertura */}
-      {!cajaAbierta && (
+      {!cajaAbierta && !isLoading && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-md">
           <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <Unlock size={16} className="text-green-600" />
@@ -124,9 +136,7 @@ export default function Caja() {
           </h2>
           <form onSubmit={handleAbrir} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Saldo inicial (COP)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Saldo inicial (COP)</label>
               <input
                 type="number"
                 placeholder="Ej: 200000"
@@ -136,79 +146,67 @@ export default function Caja() {
               />
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
-            <button
-              type="submit"
-              disabled={abriendo}
-              className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-            >
+            <button type="submit" disabled={abriendo}
+              className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
               {abriendo ? 'Abriendo...' : 'Abrir caja'}
             </button>
           </form>
         </div>
       )}
 
-      {/* Caja abierta */}
       {cajaAbierta && sesion && (
         <>
-          {/* Métricas */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-                { label: 'Saldo inicial', valor: sesion.saldoInicialCop, color: 'text-gray-800' },
-                { label: 'Total ventas', valor: sesion.totalVentasCop, color: 'text-green-600' },
-                { label: 'Gastos', valor: sesion.totalGastosCop, color: 'text-red-600' },
-                { label: 'Saldo esperado', valor: sesion.saldoEsperadoCop, color: 'text-blue-600' },
+              { label: 'Saldo inicial', valor: sesion.saldoInicialCop, color: 'text-gray-800' },
+              { label: 'Total ventas', valor: sesion.totalVentasCop, color: 'text-green-600' },
+              { label: 'Gastos', valor: sesion.totalGastosCop, color: 'text-red-600' },
+              { label: 'Saldo esperado', valor: sesion.saldoEsperadoCop, color: 'text-blue-600' },
             ].map((m) => (
-                <div key={m.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div key={m.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs text-gray-500 mb-1">{m.label}</p>
                 <p className={`text-xl font-bold ${m.color}`}>{formatCOP(m.valor)}</p>
-                </div>
+              </div>
             ))}
-            </div>
+          </div>
 
-            {/* Desglose por método de pago */}
-            <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <p className="text-xs text-gray-500 mb-1">💵 Efectivo</p>
-                <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalEfectivoCop)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <p className="text-xs text-gray-500 mb-1">🏦 Transferencia</p>
-                <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalTransferenciaCop)}</p>
+              <p className="text-xs text-gray-500 mb-1">💵 Efectivo</p>
+              <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalEfectivoCop)}</p>
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <p className="text-xs text-gray-500 mb-1">📋 Crédito</p>
-                <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalCreditoCop)}</p>
+              <p className="text-xs text-gray-500 mb-1">🏦 Transferencia</p>
+              <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalTransferenciaCop)}</p>
             </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs text-gray-500 mb-1">📋 Crédito</p>
+              <p className="text-lg font-bold text-gray-800">{formatCOP(sesion.totalCreditoCop)}</p>
             </div>
+          </div>
 
-          {/* Tabs */}
           <div className="flex gap-2 border-b border-gray-200">
             {[
               { key: 'sesion', label: 'Movimientos' },
               { key: 'gasto', label: 'Registrar gasto' },
               { key: 'cierre', label: 'Cerrar caja' },
             ].map((t) => (
-              <button
-                key={t.key}
+              <button key={t.key}
                 onClick={() => { setTab(t.key); setError('') }}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-              >
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}>
                 {t.label}
               </button>
             ))}
           </div>
 
-          {/* Tab movimientos */}
           {tab === 'sesion' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <DollarSign size={16} className="text-gray-500" />
-                <h3 className="font-semibold text-gray-700">
-                  Movimientos — Cajera: {sesion.cajera}
-                </h3>
-                <span className="text-xs text-gray-400 ml-auto">
-                  Desde {formatFecha(sesion.abiertaEn)}
-                </span>
+                <h3 className="font-semibold text-gray-700">Movimientos — Cajera: {sesion.cajera}</h3>
+                <span className="text-xs text-gray-400 ml-auto">Desde {formatFecha(sesion.abiertaEn)}</span>
               </div>
               {sesion.movimientos?.length === 0 ? (
                 <p className="text-gray-400 text-sm text-center py-6">Sin movimientos aún</p>
@@ -222,48 +220,31 @@ export default function Caja() {
             </div>
           )}
 
-          {/* Tab gasto */}
           {tab === 'gasto' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-md">
               <h3 className="font-semibold text-gray-700 mb-4">Registrar gasto operativo</h3>
               <form onSubmit={handleGasto} className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: Papelería, servicios..."
-                    value={descGasto}
-                    onChange={(e) => setDescGasto(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <input type="text" placeholder="Ej: Papelería, servicios..."
+                    value={descGasto} onChange={(e) => setDescGasto(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Monto (COP)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Ej: 15000"
-                    value={montoGasto}
-                    onChange={(e) => setMontoGasto(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto (COP)</label>
+                  <input type="number" placeholder="Ej: 15000"
+                    value={montoGasto} onChange={(e) => setMontoGasto(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 {error && <p className="text-red-500 text-sm">{error}</p>}
-                <button
-                  type="submit"
-                  disabled={guardandoGasto}
-                  className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                >
+                <button type="submit" disabled={guardandoGasto}
+                  className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
                   {guardandoGasto ? 'Registrando...' : 'Registrar gasto'}
                 </button>
               </form>
             </div>
           )}
 
-          {/* Tab cierre */}
           {tab === 'cierre' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-md">
               <h3 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
@@ -275,35 +256,21 @@ export default function Caja() {
               </p>
               <form onSubmit={handleCerrar} className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Efectivo contado (COP)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Ingresa el dinero contado en caja"
-                    value={saldoCierre}
-                    onChange={(e) => setSaldoCierre(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Efectivo contado (COP)</label>
+                  <input type="number" placeholder="Ingresa el dinero contado en caja"
+                    value={saldoCierre} onChange={(e) => setSaldoCierre(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notas de cierre (opcional)
-                  </label>
-                  <textarea
-                    placeholder="Observaciones del turno..."
-                    value={notasCierre}
-                    onChange={(e) => setNotasCierre(e.target.value)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notas de cierre (opcional)</label>
+                  <textarea placeholder="Observaciones del turno..."
+                    value={notasCierre} onChange={(e) => setNotasCierre(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                 </div>
                 {error && <p className="text-red-500 text-sm">{error}</p>}
-                <button
-                  type="submit"
-                  disabled={cerrando}
-                  className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                >
+                <button type="submit" disabled={cerrando}
+                  className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
                   {cerrando ? 'Cerrando...' : 'Cerrar caja'}
                 </button>
               </form>
