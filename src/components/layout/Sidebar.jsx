@@ -1,5 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
+import useCajaStore from '../../store/cajaStore'
+import { getCajaActual } from '../../api/caja'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -11,6 +13,7 @@ import {
   LogOut,
   Car,
   Truck,
+  Tag,
 } from 'lucide-react'
 
 const NAV_DUENO = [
@@ -22,7 +25,17 @@ const NAV_DUENO = [
   { to: '/caja', icon: DollarSign, label: 'Caja' },
   { to: '/reportes', icon: BarChart3, label: 'Reportes' },
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
-  { to: '/proveedores', icon: Truck, label: 'Proveedores' },
+  { to: '/compras', icon: Truck, label: 'Compras' },
+  { to: '/categorias', icon: Tag, label: 'Categorías' },
+]
+
+const NAV_CAJERA = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/pos', icon: ShoppingCart, label: 'Punto de Venta' },
+  { to: '/clientes', icon: Users, label: 'Clientes' },
+  { to: '/caja', icon: DollarSign, label: 'Caja' },
+  { to: '/compras', icon: Truck, label: 'Compras' },
+  { to: '/categorias', icon: Tag, label: 'Categorías' },
 ]
 
 const NAV_MECANICO = [
@@ -33,14 +46,25 @@ const NAV_MECANICO = [
 export default function Sidebar() {
   const { usuario, logout } = useAuthStore()
   const navigate = useNavigate()
+  const cajaAbierta = useCajaStore((state) => state.cajaAbierta)
 
   const esMecanico = usuario?.rol === 'MECANICO'
-  const navItems = esMecanico ? NAV_MECANICO : NAV_DUENO
+  const esCajera = usuario?.rol === 'CAJERA'
+  const navItems = esMecanico ? NAV_MECANICO : esCajera ? NAV_CAJERA : NAV_DUENO
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const handleLogout = async () => {
+  if (cajaAbierta) {
+    const confirmar = window.confirm(
+      '⚠️ La caja está abierta.\n\n¿Deseas cerrar sesión y dejar la caja abierta?\n\nPresiona "Cancelar" para ir a cerrar la caja primero.'
+    )
+    if (!confirmar) {
+      navigate('/caja')
+      return
+    }
   }
+  logout()
+  navigate('/login')
+}
 
   return (
     <aside className="w-64 bg-gray-900 text-white flex flex-col">
@@ -81,7 +105,9 @@ export default function Sidebar() {
             {usuario?.nombreCompleto || 'Usuario'}
           </p>
           <p className="text-xs text-gray-400 capitalize">
-            {usuario?.rol?.toLowerCase() || ''}
+            {usuario?.rol === 'DUENO' ? 'Dueño' :
+             usuario?.rol === 'CAJERA' ? 'Cajera' :
+             usuario?.rol === 'MECANICO' ? 'Mecánico' : ''}
           </p>
         </div>
         <button

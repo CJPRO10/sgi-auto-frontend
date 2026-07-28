@@ -1,12 +1,25 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import useAuthStore from './store/authStore'
+import useCajaStore from './store/cajaStore'
+import { getCajaActual } from './api/caja'
 import Login from './pages/auth/Login'
 import Layout from './components/layout/Layout'
-import Dashboard from './pages/dashboard/Dashboard'
 
-// Ruta protegida
 function RutaProtegida({ children }) {
   const token = useAuthStore((s) => s.token)
+  const setCajaAbierta = useCajaStore((s) => s.setCajaAbierta)
+
+  useEffect(() => {
+    if (!token) return
+    getCajaActual()
+      .then((r) => {
+        const datos = r.data.datos
+        setCajaAbierta(datos?.estaAbierta || false, datos?.id)
+      })
+      .catch(() => setCajaAbierta(false))
+  }, [token])
+
   return token ? children : <Navigate to="/login" replace />
 }
 
