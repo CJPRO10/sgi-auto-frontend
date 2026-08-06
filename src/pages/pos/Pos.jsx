@@ -192,7 +192,7 @@ export default function Pos() {
 }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-screen">
       {/* Columna izquierda */}
       <div className="flex-1 p-6 overflow-y-auto">
         <h1 className="text-2xl font-bold text-gray-800 mb-4">Punto de Venta</h1>

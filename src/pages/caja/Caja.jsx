@@ -1,50 +1,85 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCajaActual, abrirCaja, cerrarCaja, registrarGasto } from '../../api/caja'
+import { getCajaActual, abrirCaja, cerrarCaja, registrarGasto, getSesionesAbiertas, getHistorialCaja } from '../../api/caja'
+import { getUsuarios } from '../../api/usuarios'
 import { formatCOP, formatFecha } from '../../utils/formato'
-import { DollarSign, Lock, Unlock, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { DollarSign, BarChart3, Lock, Eye, Unlock, TrendingUp, TrendingDown, AlertTriangle, Users } from 'lucide-react'
 import useCajaStore from '../../store/cajaStore'
+import useAuthStore from '../../store/authStore'
+import ModalDetalleSesion from './ModalDetalleSesion'
+import ModalDetalleVenta from './ModalDetalleVenta'
+
 
 function FilaMovimiento({ mov }) {
+  const [verVenta, setVerVenta] = useState(false)
   const esIngreso = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA', 'APERTURA', 'ABONO_CREDITO'].includes(mov.tipo)
+  const esVenta = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA'].includes(mov.tipo) && mov.ventaId
+
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-      <div className="flex items-center gap-3">
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${esIngreso ? 'bg-green-100' : 'bg-red-100'}`}>
-          {esIngreso
-            ? <TrendingUp size={13} className="text-green-600" />
-            : <TrendingDown size={13} className="text-red-600" />}
-        </div>
-        <div>
-          <p className="text-sm font-medium text-gray-700">{mov.descripcion}</p>
-          <div className="flex items-center gap-2">
-            {mov.registradoPor && (
-              <p className="text-xs text-blue-500">{mov.registradoPor}</p>
-            )}
-            <p className="text-xs text-gray-400">{formatFecha(mov.creadoEn)}</p>
+    <>
+      <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+        <div className="flex items-center gap-3">
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${esIngreso ? 'bg-green-100' : 'bg-red-100'}`}>
+            {esIngreso
+              ? <TrendingUp size={13} className="text-green-600" />
+              : <TrendingDown size={13} className="text-red-600" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-gray-700">{mov.descripcion}</p>
+              {esVenta && (
+                <button onClick={() => setVerVenta(true)}
+                  className="text-xs text-blue-500 hover:text-blue-700 underline">
+                  Ver detalle
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {mov.registradoPor && <p className="text-xs text-blue-500">{mov.registradoPor}</p>}
+              <p className="text-xs text-gray-400">{formatFecha(mov.creadoEn)}</p>
+            </div>
           </div>
         </div>
+        <span className={`text-sm font-semibold ${esIngreso ? 'text-green-600' : 'text-red-600'}`}>
+          {esIngreso ? '+' : '-'}{formatCOP(mov.montoCop)}
+        </span>
       </div>
-      <span className={`text-sm font-semibold ${esIngreso ? 'text-green-600' : 'text-red-600'}`}>
-        {esIngreso ? '+' : '-'}{formatCOP(mov.montoCop)}
-      </span>
-    </div>
+
+      {verVenta && (
+        <ModalDetalleVenta
+          ventaId={mov.ventaId}
+          onClose={() => setVerVenta(false)}
+        />
+      )}
+    </>
   )
 }
 
 export default function Caja() {
   const queryClient = useQueryClient()
+  const usuario = useAuthStore((s) => s.usuario)
+  const esDueno = usuario?.rol === 'DUENO'
+
   const [tab, setTab] = useState('sesion')
+  const [cajeraId, setCajeraId] = useState('')
   const [saldoApertura, setSaldoApertura] = useState('')
+  const [sesionCierreId, setSesionCierreId] = useState('')
   const [saldoCierre, setSaldoCierre] = useState('')
   const [notasCierre, setNotasCierre] = useState('')
   const [montoGasto, setMontoGasto] = useState('')
   const [descGasto, setDescGasto] = useState('')
   const [error, setError] = useState('')
+  const [tabHistorial, setTabHistorial] = useState(false)
+  const [filtroCajeraId, setFiltroCajeraId] = useState('')
+  const [filtroDesde, setFiltroDesde] = useState('')
+  const [filtroHasta, setFiltroHasta] = useState('')
+  const [paginaHistorial, setPaginaHistorial] = useState(0)
+  const [sesionDetalle, setSesionDetalle] = useState(null)
 
   const setCajaAbierta = useCajaStore((s) => s.setCajaAbierta)
 
-  const { data: cajaData, isLoading, isError } = useQuery({
+  // Sesión del usuario actual
+  const { data: cajaData, isLoading } = useQuery({
     queryKey: ['caja-actual'],
     queryFn: () => getCajaActual().then((r) => {
       const datos = r.data.datos
@@ -55,6 +90,33 @@ export default function Caja() {
     onError: () => setCajaAbierta(false),
   })
 
+  const { data: historialData, isLoading: cargandoHistorial } = useQuery({
+    queryKey: ['historial-caja', paginaHistorial, filtroCajeraId, filtroDesde, filtroHasta],
+    queryFn: () => getHistorialCaja(paginaHistorial, filtroCajeraId, filtroDesde, filtroHasta)
+      .then((r) => r.data.datos),
+    enabled: Boolean(esDueno && tabHistorial),
+  })
+  const historial = historialData?.content || []
+  const totalPaginasHistorial = historialData?.totalPages || 1
+
+  // Sesiones abiertas de todos (solo dueño)
+  const { data: sesionesAbiertasData } = useQuery({
+    queryKey: ['sesiones-abiertas'],
+    queryFn: () => getSesionesAbiertas().then((r) => r.data.datos),
+    enabled: esDueno,
+  })
+  const sesionesAbiertas = sesionesAbiertasData || []
+
+  // Usuarios cajeras (para abrir caja a nombre de alguien)
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: () => getUsuarios().then((r) => r.data.datos),
+    enabled: esDueno,
+  })
+  const cajeras = (usuariosData || []).filter(
+    (u) => (u.rol === 'CAJERA' || u.rol === 'DUENO') && u.estaActivo
+  )
+
   const sesion = cajaData
   const cajaAbierta = sesion?.estaAbierta === true
 
@@ -63,8 +125,10 @@ export default function Caja() {
     onSuccess: (res) => {
       setCajaAbierta(true, res.data.datos?.id)
       queryClient.invalidateQueries(['caja-actual'])
+      queryClient.invalidateQueries(['sesiones-abiertas'])
       queryClient.invalidateQueries(['dashboard'])
       setSaldoApertura('')
+      setCajeraId('')
       setError('')
     },
     onError: (err) => setError(err.response?.data?.mensaje || 'Error al abrir caja'),
@@ -75,10 +139,14 @@ export default function Caja() {
     onSuccess: () => {
       setCajaAbierta(false)
       queryClient.invalidateQueries(['caja-actual'])
+      queryClient.invalidateQueries(['sesiones-abiertas'])
+      queryClient.invalidateQueries(['historial-caja'])
       queryClient.invalidateQueries(['dashboard'])
       setSaldoCierre('')
       setNotasCierre('')
+      setSesionCierreId('')
       setError('')
+      setTab('sesion')
     },
     onError: (err) => setError(err.response?.data?.mensaje || 'Error al cerrar caja'),
   })
@@ -98,14 +166,31 @@ export default function Caja() {
     e.preventDefault()
     setError('')
     if (!saldoApertura) { setError('Ingresa el saldo inicial'); return }
-    abrir({ saldoInicialCop: Number(saldoApertura) })
+    abrir({
+      saldoInicialCop: Number(saldoApertura),
+      cajeraId: cajeraId ? Number(cajeraId) : null,
+    })
   }
 
   const handleCerrar = (e) => {
     e.preventDefault()
     setError('')
     if (!saldoCierre) { setError('Ingresa el efectivo contado'); return }
-    cerrar({ saldoFinalContadoCop: Number(saldoCierre), notas: notasCierre })
+    
+    // Si solo hay una sesión abierta, usarla automáticamente
+    const idSesion = sesionCierreId 
+      ? Number(sesionCierreId) 
+      : sesionesAbiertas.length === 1 
+        ? sesionesAbiertas[0].id 
+        : sesion?.id
+
+    if (!idSesion) { setError('Selecciona la sesión a cerrar'); return }
+
+    cerrar({
+      sesionId: idSesion,
+      saldoFinalContadoCop: Number(saldoCierre),
+      notas: notasCierre,
+    })
   }
 
   const handleGasto = (e) => {
@@ -124,11 +209,62 @@ export default function Caja() {
         </div>
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${cajaAbierta ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
           {cajaAbierta ? <Unlock size={14} /> : <Lock size={14} />}
-          {cajaAbierta ? 'Caja abierta' : 'Caja cerrada'}
+          {cajaAbierta ? 'Mi caja abierta' : 'Mi caja cerrada'}
         </div>
       </div>
+      {esDueno && (
+        <button
+          onClick={() => setTabHistorial(!tabHistorial)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tabHistorial
+              ? 'bg-blue-600 text-white'
+              : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <BarChart3 size={15} />
+          {tabHistorial ? 'Ver cajas activas' : 'Ver historial'}
+        </button>
+      )}
 
-      {!cajaAbierta && !isLoading && (
+      {/* Vista general dueño — sesiones abiertas */}
+      {esDueno && sesionesAbiertas.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={16} className="text-blue-500" />
+            <h2 className="font-semibold text-gray-700">Cajas activas del negocio</h2>
+            <span className="ml-auto bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+              {sesionesAbiertas.length} abiertas
+            </span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {sesionesAbiertas.map((s) => (
+              <div key={s.id} className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-gray-800">{s.cajera}</p>
+                  <span className="text-xs text-gray-400">Desde {formatFecha(s.abiertaEn)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-gray-400">Ventas</p>
+                    <p className="font-semibold text-green-600">{formatCOP(s.totalVentasCop)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Gastos</p>
+                    <p className="font-semibold text-red-600">{formatCOP(s.totalGastosCop)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Saldo esperado</p>
+                    <p className="font-semibold text-blue-600">{formatCOP(s.saldoEsperadoCop)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Abrir caja — solo dueño */}
+      {esDueno && !isLoading && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-md">
           <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <Unlock size={16} className="text-green-600" />
@@ -136,16 +272,22 @@ export default function Caja() {
           </h2>
           <form onSubmit={handleAbrir} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Saldo inicial (COP)</label>
-              <input
-                type="number"
-                placeholder="Ej: 200000"
-                value={saldoApertura}
-                onChange={(e) => setSaldoApertura(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Abrir para</label>
+              <select value={cajeraId} onChange={(e) => setCajeraId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Mi propia caja</option>
+                {cajeras.filter(c => c.rol !== 'DUENO').map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombreCompleto}</option>
+                ))}
+              </select>
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Saldo inicial (COP)</label>
+              <input type="number" placeholder="Ej: 200000" value={saldoApertura}
+                onChange={(e) => setSaldoApertura(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            {error && tab !== 'cierre' && tab !== 'gasto' && <p className="text-red-500 text-sm">{error}</p>}
             <button type="submit" disabled={abriendo}
               className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
               {abriendo ? 'Abriendo...' : 'Abrir caja'}
@@ -154,6 +296,7 @@ export default function Caja() {
         </div>
       )}
 
+      {/* Mi sesión actual */}
       {cajaAbierta && sesion && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -189,10 +332,9 @@ export default function Caja() {
             {[
               { key: 'sesion', label: 'Movimientos' },
               { key: 'gasto', label: 'Registrar gasto' },
-              { key: 'cierre', label: 'Cerrar caja' },
+              ...(esDueno ? [{ key: 'cierre', label: 'Cerrar caja' }] : []),
             ].map((t) => (
-              <button key={t.key}
-                onClick={() => { setTab(t.key); setError('') }}
+              <button key={t.key} onClick={() => { setTab(t.key); setError('') }}
                 className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}>
@@ -205,7 +347,7 @@ export default function Caja() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <DollarSign size={16} className="text-gray-500" />
-                <h3 className="font-semibold text-gray-700">Movimientos — Cajera: {sesion.cajera}</h3>
+                <h3 className="font-semibold text-gray-700">Movimientos — {sesion.cajera}</h3>
                 <span className="text-xs text-gray-400 ml-auto">Desde {formatFecha(sesion.abiertaEn)}</span>
               </div>
               {sesion.movimientos?.length === 0 ? (
@@ -245,16 +387,27 @@ export default function Caja() {
             </div>
           )}
 
-          {tab === 'cierre' && (
+          {tab === 'cierre' && esDueno && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-md">
               <h3 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
                 <AlertTriangle size={16} className="text-orange-500" />
                 Cerrar sesión de caja
               </h3>
-              <p className="text-xs text-gray-400 mb-4">
-                Saldo esperado: <strong>{formatCOP(sesion.saldoEsperadoCop)}</strong>
-              </p>
-              <form onSubmit={handleCerrar} className="space-y-3">
+              <form onSubmit={handleCerrar} className="space-y-3 mt-4">
+                {sesionesAbiertas.length > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Sesión a cerrar</label>
+                    <select value={sesionCierreId} onChange={(e) => setSesionCierreId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Seleccionar cajera</option>
+                      {sesionesAbiertas.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.cajera} — Saldo esperado: {formatCOP(s.saldoEsperadoCop)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Efectivo contado (COP)</label>
                   <input type="number" placeholder="Ingresa el dinero contado en caja"
@@ -277,6 +430,121 @@ export default function Caja() {
             </div>
           )}
         </>
+      )}
+
+      {/* Cajera sin caja abierta */}
+      {!esDueno && !cajaAbierta && !isLoading && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+          <Lock size={32} className="text-yellow-500 mx-auto mb-3" />
+          <p className="font-medium text-gray-700 mb-1">Tu caja está cerrada</p>
+          <p className="text-sm text-gray-500">El administrador debe abrir tu sesión de caja.</p>
+        </div>
+      )}
+      {esDueno && tabHistorial && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-700">Historial de cajas cerradas</h2>
+
+          {/* Filtros */}
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cajera</label>
+              <select value={filtroCajeraId}
+                onChange={(e) => { setFiltroCajeraId(e.target.value); setPaginaHistorial(0) }}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Todas</option>
+                {cajeras.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombreCompleto}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
+              <input type="date" value={filtroDesde}
+                onChange={(e) => { setFiltroDesde(e.target.value); setPaginaHistorial(0) }}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
+              <input type="date" value={filtroHasta}
+                onChange={(e) => { setFiltroHasta(e.target.value); setPaginaHistorial(0) }}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <button onClick={() => { setFiltroCajeraId(''); setFiltroDesde(''); setFiltroHasta(''); setPaginaHistorial(0) }}
+              className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+              Limpiar
+            </button>
+          </div>
+
+          {/* Tabla */}
+          {cargandoHistorial ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : historial.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-8">No hay cajas cerradas</p>
+          ) : (
+            <>
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Cajera</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Apertura</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Cierre</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Ventas</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Gastos</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Diferencia</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {historial.map((s) => (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800">{s.cajera}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{formatFecha(s.abiertaEn)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{formatFecha(s.cerradaEn)}</td>
+                      <td className="px-4 py-3 text-right text-sm text-green-600 font-medium">{formatCOP(s.totalVentasCop)}</td>
+                      <td className="px-4 py-3 text-right text-sm text-red-600">{formatCOP(s.totalGastosCop)}</td>
+                      <td className={`px-4 py-3 text-right text-sm font-semibold ${
+                        s.diferenciaCop >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {s.diferenciaCop >= 0 ? '+' : ''}{formatCOP(s.diferenciaCop)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setSesionDetalle(s.id)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <Eye size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {totalPaginasHistorial > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <button onClick={() => setPaginaHistorial((p) => Math.max(0, p - 1))}
+                    disabled={paginaHistorial === 0}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">
+                    Anterior
+                  </button>
+                  <span className="text-sm text-gray-500">
+                    Página {paginaHistorial + 1} de {totalPaginasHistorial}
+                  </span>
+                  <button onClick={() => setPaginaHistorial((p) => Math.min(totalPaginasHistorial - 1, p + 1))}
+                    disabled={paginaHistorial >= totalPaginasHistorial - 1}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">
+                    Siguiente
+                  </button>
+                </div>
+              )}
+              {sesionDetalle && (
+                <ModalDetalleSesion
+                  sesionId={sesionDetalle}
+                  onClose={() => setSesionDetalle(null)}
+                />
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   )

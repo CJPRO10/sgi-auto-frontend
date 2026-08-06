@@ -29,6 +29,9 @@ export default function Inventario() {
         ? buscarProductos(busqueda).then((r) => ({ content: r.data.datos, totalPages: 1 }))
         : getProductos(pagina).then((r) => r.data.datos),
     keepPreviousData: true,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   })
 
   const { mutate: eliminar } = useMutation({

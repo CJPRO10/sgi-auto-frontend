@@ -23,7 +23,7 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto h-full">
         <Routes>
           <Route path="/" element={esMecanico ? <DashboardMecanico /> : esCajera ? <DashboardCajera /> : <Dashboard />} />
           <Route path="/dashboard" element={esMecanico ? <DashboardMecanico /> : esCajera ? <DashboardCajera /> : <Dashboard />} />
