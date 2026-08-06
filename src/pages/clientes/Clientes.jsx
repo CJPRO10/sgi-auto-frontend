@@ -129,15 +129,13 @@ export default function Clientes() {
                   </td>
                   <td className="px-6 py-4">
                     {c.creditoHabilitado ? (
-                      <button
-                        onClick={() => setClienteCredito(c)}
-                        className="flex items-center gap-2 text-sm group"
-                      >
+                      <button onClick={() => setClienteCredito(c)}
+                        className="flex items-center gap-2 text-sm group">
                         <CreditCard size={14} className="text-green-500" />
                         <span className="text-green-700 font-medium">
-                          {formatCOP(c.cupoCreditoCop)}
+                          {formatCOP(c.saldoCreditoCop)}
                         </span>
-                        <Eye size={13} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        <Eye size={13} className="text-gray.400 group-hover:text-blue-500 transition-colors" />
                       </button>
                     ) : (
                       <span className="text-xs text-gray-400">Sin crédito</span>

@@ -57,7 +57,9 @@ export default function ModalDetalleOT({ ot, onClose, onCambioEstado }) {
 
   const { data: productosData } = useQuery({
     queryKey: ['productos', 0],
-    queryFn: () => getProductos(0, 100).then((r) => r.data.datos),
+    queryFn: () => getProductos(0, 100).then((r) => r.data.datos.content),
+    staleTime: 0,
+    refetchOnMount: true,
   })
   const productos = productosData?.content || []
 

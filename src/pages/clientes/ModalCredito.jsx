@@ -140,6 +140,7 @@ export default function ModalCredito({ cliente, onClose }) {
   const [montoDeuda, setMontoDeuda] = useState('')
   const [notasDeuda, setNotasDeuda] = useState('')
   const [error, setError] = useState('')
+  const [metodoPagoAbono, setMetodoPagoAbono] = useState('EFECTIVO')
 
   const { data: creditoData, isLoading } = useQuery({
     queryKey: ['credito', cliente.id],
@@ -152,6 +153,7 @@ export default function ModalCredito({ cliente, onClose }) {
     mutationFn: () => registrarAbono(cliente.id, {
       montoCop: Number(montoAbono),
       notas: notasAbono || 'Abono en efectivo',
+      metodoPago: metodoPagoAbono,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries(['credito', cliente.id])
@@ -362,6 +364,14 @@ export default function ModalCredito({ cliente, onClose }) {
                   onChange={(e) => setNotasAbono(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Método de pago</label>
+                <select value={metodoPagoAbono} onChange={(e) => setMetodoPagoAbono(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="EFECTIVO">Efectivo</option>
+                  <option value="TRANSFERENCIA">Transferencia</option>
+                </select>
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <button
