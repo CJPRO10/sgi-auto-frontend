@@ -1,0 +1,472 @@
+import { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getProductos, buscarProductos } from '../../api/inventario'
+import { buscarClientes } from '../../api/clientes'
+import { crearVenta } from '../../api/pos'
+import { formatCOP } from '../../utils/formato'
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, Package, DollarSign } from 'lucide-react'
+import { useDebounce } from '../../hooks/useDebounce'
+import {useNavigate } from 'react-router-dom'
+import useCajaStore from '../../store/cajaStore'
+
+const METODOS_PAGO = [
+  { value: 'EFECTIVO', label: 'Efectivo' },
+  { value: 'TRANSFERENCIA', label: 'Transferencia' },
+  { value: 'CREDITO', label: 'Crédito' },
+  { value: 'MIXTO', label: 'Mixto' },
+]
+
+function generarUUID() {
+  return crypto.randomUUID()
+}
+
+export default function Pos() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const cajaAbierta = useCajaStore((s) => s.cajaAbierta)
+  const cargandoCaja = useCajaStore((s) => s.cargando)
+
+  const [busqueda, setBusqueda] = useState('')
+  const debouncedBusqueda = useDebounce(busqueda, 400)
+
+  const [carrito, setCarrito] = useState([])
+
+  const [busquedaCliente, setBusquedaCliente] = useState('')
+  const [clienteEncontrado, setClienteEncontrado] = useState(null)
+  const debouncedCliente = useDebounce(busquedaCliente, 300)
+
+  const [metodoPago, setMetodoPago] = useState('EFECTIVO')
+  const [montoEfectivo, setMontoEfectivo] = useState('')
+  const [montoTransferencia, setMontoTransferencia] = useState('')
+  const [montoCredito, setMontoCredito] = useState('')
+
+  const [mensajeExito, setMensajeExito] = useState(null)
+  const [error, setError] = useState('')
+
+  const { data: productosData } = useQuery({
+    queryKey: debouncedBusqueda.length >= 2
+      ? ['productos-busqueda', debouncedBusqueda]
+      : ['productos', 0],
+    queryFn: () =>
+      debouncedBusqueda.length >= 2
+        ? buscarProductos(debouncedBusqueda).then((r) => r.data.datos)
+        : getProductos(0, 50).then((r) => r.data.datos.content),
+  })
+  const productos = productosData || []
+
+  const { data: clientesSugeridosData } = useQuery({
+    queryKey: ['clientes-busqueda-pos', debouncedCliente],
+    queryFn: () =>
+      debouncedCliente.length >= 2
+        ? buscarClientes(debouncedCliente).then((r) => r.data.datos)
+        : Promise.resolve([]),
+    enabled: Boolean(debouncedCliente.length >= 2 && !clienteEncontrado),
+  })
+  const clientesSugeridos = clientesSugeridosData || []
+
+  const subtotal = useMemo(
+    () => carrito.reduce((sum, item) => sum + item.precioUnitarioCop * item.cantidad, 0),
+    [carrito]
+  )
+
+  const totalMixto = Number(montoEfectivo || 0) + Number(montoTransferencia || 0) + Number(montoCredito || 0)
+  const vuelto = metodoPago === 'EFECTIVO' && montoEfectivo
+    ? Number(montoEfectivo) - subtotal
+    : 0
+
+  const { mutate: registrarVenta, isPending } = useMutation({
+    mutationFn: crearVenta,
+    onSuccess: (res) => {
+      setMensajeExito(res.data.datos)
+      setCarrito([])
+      setClienteEncontrado(null)
+      setBusquedaCliente('')
+      setMontoEfectivo('')
+      setMontoTransferencia('')
+      setMontoCredito('')
+      setError('')
+      queryClient.invalidateQueries(['productos'])
+      queryClient.invalidateQueries(['dashboard'])
+    },
+    onError: (err) => {
+      setError(err.response?.data?.mensaje || 'Error al procesar la venta')
+    },
+  })
+
+  const agregarAlCarrito = (producto) => {
+    setCarrito((prev) => {
+      const existe = prev.find((i) => i.productoId === producto.id)
+      if (existe) {
+        if (existe.cantidad >= producto.stockActual) return prev
+        return prev.map((i) =>
+          i.productoId === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i
+        )
+      }
+      return [
+        ...prev,
+        {
+          productoId: producto.id,
+          nombre: producto.nombre,
+          precioUnitarioCop: producto.precioVentaDetal,
+          cantidad: 1,
+          stockDisponible: producto.stockActual,
+        },
+      ]
+    })
+  }
+
+  const cambiarCantidad = (productoId, delta) => {
+    setCarrito((prev) =>
+      prev.map((i) => {
+        if (i.productoId !== productoId) return i
+        const nuevaCantidad = i.cantidad + delta
+        if (nuevaCantidad < 1 || nuevaCantidad > i.stockDisponible) return i
+        return { ...i, cantidad: nuevaCantidad }
+      })
+    )
+  }
+
+  const quitarDelCarrito = (productoId) => {
+    setCarrito((prev) => prev.filter((i) => i.productoId !== productoId))
+  }
+
+  const handleCobrar = () => {
+    setError('')
+    if (carrito.length === 0) {
+      setError('Agrega al menos un producto')
+      return
+    }
+    if (metodoPago === 'EFECTIVO' && montoEfectivo && Number(montoEfectivo) < subtotal) {
+      setError(`Faltan ${formatCOP(subtotal - Number(montoEfectivo))} para completar el pago`)
+      return
+    }
+    if (metodoPago === 'MIXTO' && totalMixto < subtotal) {
+      setError(`Faltan ${formatCOP(subtotal - totalMixto)} para completar el pago`)
+      return
+    }
+
+    registrarVenta({
+      claveIdempotencia: generarUUID(),
+      clienteId: clienteEncontrado ? clienteEncontrado.id : null,
+      nombreClienteAnonimo: clienteEncontrado ? null : 'Cliente general',
+      metodoPago,
+      montoPagadoCop: metodoPago === 'EFECTIVO'
+        ? (montoEfectivo ? Number(montoEfectivo) : subtotal)
+        : subtotal,
+      montoEfectivoCop: Number(montoEfectivo) || 0,
+      montoTransferenciaCop: Number(montoTransferencia) || 0,
+      montoCreditoCop: Number(montoCredito) || 0,
+      items: carrito.map((i) => ({
+        productoId: i.productoId,
+        cantidad: i.cantidad,
+        precioUnitarioCop: i.precioUnitarioCop,
+      })),
+    })
+  }
+  if (cargandoCaja) return (
+  <div className="flex items-center justify-center h-full">
+    <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+)
+
+  if (!cajaAbierta) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center max-w-sm">
+        <div className="w-14 h-14 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <DollarSign size={24} className="text-yellow-600" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Caja cerrada</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          Debes abrir la caja antes de realizar ventas.
+        </p>
+        <button
+          onClick={() => navigate('/caja')}
+          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+        >
+          Ir a Caja
+        </button>
+      </div>
+    </div>
+  )
+}
+
+  return (
+    <div className="flex h-screen">
+      {/* Columna izquierda */}
+      <div className="flex-1 p-6 overflow-y-auto">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4">Punto de Venta</h1>
+        <div className="relative mb-4">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar producto por nombre o código..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {productos.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => agregarAlCarrito(p)}
+              disabled={p.stockActual === 0}
+              className="bg-white border border-gray-200 rounded-xl p-4 text-left hover:border-blue-400 hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center mb-2">
+                <Package size={16} className="text-indigo-600" />
+              </div>
+              <p className="font-medium text-sm text-gray-800 truncate">{p.nombre}</p>
+              <p className="text-xs text-gray-400 mb-2">Stock: {p.stockActual}</p>
+              <p className="font-semibold text-blue-600">{formatCOP(p.precioVentaDetal)}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Columna derecha: carrito */}
+      <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+        <div className="p-6 border-b">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={18} className="text-gray-600" />
+            <h2 className="font-semibold text-gray-800">Carrito</h2>
+            <span className="ml-auto bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+              {carrito.length} {carrito.length === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {carrito.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-8">Carrito vacío</p>
+          ) : (
+            carrito.map((item) => (
+              <div key={item.productoId} className="bg-gray-50 rounded-lg p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-sm font-medium text-gray-800 flex-1">{item.nombre}</p>
+                  <button onClick={() => quitarDelCarrito(item.productoId)}>
+                    <Trash2 size={14} className="text-gray-400 hover:text-red-500" />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => cambiarCantidad(item.productoId, -1)}
+                      className="w-6 h-6 flex items-center justify-center bg-white border border-gray-200 rounded hover:bg-gray-100"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <span className="text-sm font-medium w-6 text-center">{item.cantidad}</span>
+                    <button
+                      onClick={() => cambiarCantidad(item.productoId, 1)}
+                      className="w-6 h-6 flex items-center justify-center bg-white border border-gray-200 rounded hover:bg-gray-100"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                  <span className="text-sm font-semibold">
+                    {formatCOP(item.precioUnitarioCop * item.cantidad)}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="p-4 border-t space-y-3">
+          {/* Búsqueda cliente */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Buscar cliente (nombre o cédula)
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Escribe nombre o cédula..."
+                value={busquedaCliente}
+                onChange={(e) => {
+                  setBusquedaCliente(e.target.value)
+                  if (!e.target.value) setClienteEncontrado(null)
+                }}
+                disabled={!!clienteEncontrado}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              />
+              {clientesSugeridos.length > 0 && !clienteEncontrado && (
+                <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
+                  {clientesSugeridos.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setClienteEncontrado(c)
+                        setBusquedaCliente(c.nombreCompleto)
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0"
+                    >
+                      <p className="font-medium">{c.nombreCompleto}</p>
+                      <p className="text-xs text-gray-400">{c.tipoIdentificacion} {c.numeroIdentificacion}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {clienteEncontrado ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-blue-800">{clienteEncontrado.nombreCompleto}</p>
+                  <p className="text-blue-600 text-xs">
+                    ⭐ {clienteEncontrado.saldoPuntos} puntos — {clienteEncontrado.tipoIdentificacion} {clienteEncontrado.numeroIdentificacion}
+                  </p>
+                </div>
+                <button onClick={() => { setClienteEncontrado(null); setBusquedaCliente('') }}
+                  className="text-blue-400 hover:text-blue-600 ml-2">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">Sin cliente — venta como ocasional</p>
+          )}
+
+          {/* Método de pago */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Método de pago</label>
+            <select
+              value={metodoPago}
+              onChange={(e) => {
+                setMetodoPago(e.target.value)
+                setMontoEfectivo('')
+                setMontoTransferencia('')
+                setMontoCredito('')
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {METODOS_PAGO.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Efectivo */}
+          {metodoPago === 'EFECTIVO' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Monto recibido</label>
+              <input
+                type="number"
+                placeholder={String(subtotal)}
+                value={montoEfectivo}
+                onChange={(e) => setMontoEfectivo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {montoEfectivo && vuelto > 0 && (
+                <div className="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+                  <span className="text-sm font-medium text-green-700">Vuelto</span>
+                  <span className="text-lg font-bold text-green-700">{formatCOP(vuelto)}</span>
+                </div>
+              )}
+              {montoEfectivo && vuelto < 0 && (
+                <div className="flex justify-between items-center bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">
+                  <span className="text-sm font-medium text-red-700">Falta</span>
+                  <span className="text-lg font-bold text-red-700">{formatCOP(Math.abs(vuelto))}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mixto */}
+          {metodoPago === 'MIXTO' && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-600">Desglose del pago</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Efectivo</label>
+                <input type="number" placeholder="0" value={montoEfectivo}
+                  onChange={(e) => setMontoEfectivo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Transferencia</label>
+                <input type="number" placeholder="0" value={montoTransferencia}
+                  onChange={(e) => setMontoTransferencia(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Crédito</label>
+                <input type="number" placeholder="0" value={montoCredito}
+                  onChange={(e) => setMontoCredito(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {totalMixto > 0 && (
+                <div className={`flex justify-between text-xs px-2 py-1.5 rounded-lg ${
+                  totalMixto >= subtotal ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  <span>Total ingresado</span>
+                  <span className="font-semibold">{formatCOP(totalMixto)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Total */}
+          <div className="flex justify-between items-center py-2 border-t">
+            <span className="text-gray-600">Total</span>
+            <span className="text-xl font-bold text-gray-800">{formatCOP(subtotal)}</span>
+          </div>
+
+          {error && (
+            <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+
+          <button
+            onClick={handleCobrar}
+            disabled={
+              isPending ||
+              carrito.length === 0 ||
+              (metodoPago === 'EFECTIVO' && montoEfectivo && Number(montoEfectivo) < subtotal) ||
+              (metodoPago === 'MIXTO' && totalMixto > 0 && totalMixto < subtotal)
+            }
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isPending ? 'Procesando...' : 'Cobrar'}
+          </button>
+        </div>
+      </div>
+
+      {/* Modal éxito */}
+      {mensajeExito && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ShoppingCart size={24} className="text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Venta registrada</h3>
+            <p className="text-gray-500 text-sm mb-2">Total: {formatCOP(mensajeExito.totalCop)}</p>
+            {mensajeExito.vueltoCop > 0 && (
+              <div className="bg-green-50 rounded-lg px-4 py-2 mb-3">
+                <p className="text-green-700 font-bold text-lg">
+                  Vuelto: {formatCOP(mensajeExito.vueltoCop)}
+                </p>
+              </div>
+            )}
+            {mensajeExito.puntosGanados > 0 && (
+              <p className="text-yellow-600 text-sm mb-4">
+                ⭐ +{mensajeExito.puntosGanados} puntos ganados
+              </p>
+            )}
+            <button
+              onClick={() => setMensajeExito(null)}
+              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+            >
+              Nueva venta
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
