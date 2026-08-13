@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  getReporteVentas,
-  getReporteInventario,
-  getListaPrecios,
-} from '../../api/reportes'
+import { getReporteVentas, getReporteInventario, getListaPrecios } from '../../api/reportes'
 import { formatCOP, formatFecha } from '../../utils/formato'
 import { jsPDF } from 'jspdf'
 import { BarChart3, Package, DollarSign, Download, Search } from 'lucide-react'
+
+
+
 
 function pdfVentas(ventas, desde, hasta) {
   const doc = new jsPDF()
@@ -132,12 +131,8 @@ function pdfListaPrecios(productos) {
 
 export default function Reportes() {
   const [tab, setTab] = useState('ventas')
-  const [desde, setDesde] = useState(
-    new Date(new Date().setDate(1)).toISOString().split('T')[0]
-  )
-  const [hasta, setHasta] = useState(
-    new Date().toISOString().split('T')[0]
-  )
+  const [desde, setDesde] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0])
+  const [hasta, setHasta] = useState(new Date().toISOString().split('T')[0])
   const [buscar, setBuscar] = useState(0)
 
   const { data: ventasData, isLoading: cargandoVentas } = useQuery({

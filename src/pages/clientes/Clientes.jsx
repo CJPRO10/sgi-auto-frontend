@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getClientes, buscarClientes, eliminarCliente } from '../../api/clientes'
 import { formatCOP } from '../../utils/formato'
-import { Search, Plus, Trash2, Edit2, Star, CreditCard, AlertTriangle, Eye } from 'lucide-react'
+import { Search, Plus, Trash2, Edit2, Star, CreditCard, Eye } from 'lucide-react'
 import ModalCrearCliente from './ModalCrearCliente'
 import ModalCredito from './ModalCredito'
 

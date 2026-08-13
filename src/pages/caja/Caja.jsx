@@ -3,31 +3,151 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCajaActual, abrirCaja, cerrarCaja, registrarGasto, getSesionesAbiertas, getHistorialCaja } from '../../api/caja'
 import { getUsuarios } from '../../api/usuarios'
 import { formatCOP, formatFecha } from '../../utils/formato'
-import { DollarSign, BarChart3, Lock, Eye, Unlock, TrendingUp, TrendingDown, AlertTriangle, Users } from 'lucide-react'
+import { DollarSign, BarChart3, Lock, Download, Eye, Unlock, TrendingUp, TrendingDown, AlertTriangle, Users } from 'lucide-react'
 import useCajaStore from '../../store/cajaStore'
 import useAuthStore from '../../store/authStore'
 import ModalDetalleSesion from './ModalDetalleSesion'
 import ModalDetalleVenta from './ModalDetalleVenta'
+import { jsPDF } from 'jspdf'
 
+function generarCierrePDF(sesion) {
+  const doc = new jsPDF()
+  const fmt = (n) => new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', minimumFractionDigits: 0
+  }).format(n || 0)
+
+  doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+  doc.text('SGI-AUTO', 14, 20)
+  doc.setFontSize(11); doc.setFont('helvetica', 'normal')
+  doc.text('Reporte de Cierre de Caja', 14, 28)
+  doc.line(14, 32, 196, 32)
+
+  doc.setFontSize(10)
+  doc.text(`Cajera: ${sesion.cajera}`, 14, 40)
+  doc.text(`Apertura: ${sesion.abiertaEn ? new Date(sesion.abiertaEn).toLocaleString('es-CO') : '—'}`, 14, 47)
+  doc.text(`Cierre: ${sesion.cerradaEn ? new Date(sesion.cerradaEn).toLocaleString('es-CO') : '—'}`, 14, 54)
+  doc.line(14, 59, 196, 59)
+
+  // Resumen
+  let y = 67
+  doc.setFont('helvetica', 'bold')
+  doc.text('RESUMEN DE LA SESIÓN', 14, y); y += 8
+  doc.setFont('helvetica', 'normal')
+
+  const filas = [
+    ['Saldo inicial', fmt(sesion.saldoInicialCop)],
+    ['Total ventas', fmt(sesion.totalVentasCop)],
+    ['Abonos crédito', fmt(sesion.totalAbonosCreditoCop)],
+    ['Total gastos', fmt(sesion.totalGastosCop)],
+    ['Saldo esperado', fmt(sesion.saldoEsperadoCop)],
+  ]
+  filas.forEach(([label, valor]) => {
+    doc.text(label + ':', 14, y)
+    doc.text(valor, 120, y)
+    y += 7
+  })
+
+  // Desglose método pago
+  y += 3
+  doc.line(14, y, 196, y); y += 7
+  doc.setFont('helvetica', 'bold')
+  doc.text('DESGLOSE POR MÉTODO DE PAGO', 14, y); y += 8
+  doc.setFont('helvetica', 'normal')
+  ;[
+    ['Efectivo', fmt(sesion.totalEfectivoCop)],
+    ['Transferencia', fmt(sesion.totalTransferenciaCop)],
+    ['Crédito', fmt(sesion.totalCreditoCop)],
+  ].forEach(([label, valor]) => {
+    doc.text(label + ':', 14, y)
+    doc.text(valor, 120, y)
+    y += 7
+  })
+
+  // Cierre
+  y += 3
+  doc.line(14, y, 196, y); y += 7
+  doc.setFont('helvetica', 'bold')
+  doc.text('CUADRE DE CAJA', 14, y); y += 8
+  doc.setFont('helvetica', 'normal')
+  doc.text('Efectivo contado:', 14, y)
+  doc.text(fmt(sesion.saldoFinalCop), 120, y); y += 7
+  doc.text('Saldo esperado:', 14, y)
+  doc.text(fmt(sesion.saldoEsperadoCop), 120, y); y += 7
+
+  const diferencia = sesion.diferenciaCop || 0
+  doc.setFont('helvetica', 'bold')
+  doc.text('Diferencia:', 14, y)
+  doc.setTextColor(diferencia >= 0 ? 0 : 220, diferencia >= 0 ? 150 : 38, 38)
+  doc.text(`${diferencia >= 0 ? '+' : ''}${fmt(diferencia)}`, 120, y)
+  doc.setTextColor(0, 0, 0); y += 10
+
+  if (sesion.notasCierre) {
+    doc.line(14, y, 196, y); y += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Notas de cierre:', 14, y); y += 7
+    doc.setFont('helvetica', 'normal')
+    doc.text(sesion.notasCierre, 14, y); y += 10
+  }
+
+  // Movimientos
+  if (sesion.movimientos?.length > 0) {
+    doc.line(14, y, 196, y); y += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('MOVIMIENTOS', 14, y); y += 8
+    doc.setFillColor(240, 240, 240)
+    doc.rect(14, y - 5, 182, 7, 'F')
+    doc.text('Tipo', 16, y)
+    doc.text('Descripción', 50, y)
+    doc.text('Usuario', 130, y)
+    doc.text('Monto', 168, y)
+    y += 5
+
+    doc.setFont('helvetica', 'normal')
+    sesion.movimientos.forEach((m) => {
+      if (y > 270) { doc.addPage(); y = 20 }
+      const esIngreso = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA', 'APERTURA', 'ABONO_CREDITO'].includes(m.tipo)
+      doc.text(m.tipo || '', 16, y)
+      doc.text((m.descripcion || '').substring(0, 35), 50, y)
+      doc.text((m.registradoPor || '').substring(0, 20), 130, y)
+      esIngreso ? doc.setTextColor(22, 163, 74) : doc.setTextColor(220, 38, 38)
+      doc.text(`${esIngreso ? '+' : '-'}${fmt(m.montoCop)}`, 168, y)
+      doc.setTextColor(0, 0, 0)
+      y += 6
+    })
+  }
+
+  doc.setFontSize(8); doc.setTextColor(150, 150, 150)
+  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleString('es-CO'), 14, 290)
+  doc.setTextColor(0, 0, 0)
+
+  const fecha = sesion.cerradaEn
+    ? new Date(sesion.cerradaEn).toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0]
+  doc.save(`cierre-caja-${sesion.cajera?.replace(/\s+/g, '-')}-${fecha}.pdf`)
+}
 
 function FilaMovimiento({ mov }) {
   const [verVenta, setVerVenta] = useState(false)
   const esIngreso = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA', 'APERTURA', 'ABONO_CREDITO'].includes(mov.tipo)
+  const esAnulacion = mov.descripcion?.toLowerCase().includes('anulación') || 
+                      mov.descripcion?.toLowerCase().includes('anulacion')
   const esVenta = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA'].includes(mov.tipo) && mov.ventaId
 
   return (
     <>
-      <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <div className={`flex items-center justify-between py-2 border-b border-gray-50 last:border-0 ${esAnulacion ? 'bg-red-50' : ''}`}>
         <div className="flex items-center gap-3">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${esIngreso ? 'bg-green-100' : 'bg-red-100'}`}>
-            {esIngreso
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${esAnulacion ? 'bg-red-200' : esIngreso ? 'bg-green-100' : 'bg-red-100'}`}>
+            {esIngreso && !esAnulacion
               ? <TrendingUp size={13} className="text-green-600" />
               : <TrendingDown size={13} className="text-red-600" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-gray-700">{mov.descripcion}</p>
-              {esVenta && (
+              <p className={`text-sm font-medium ${esAnulacion ? 'text-red-700' : 'text-gray-700'}`}>
+                {mov.descripcion}
+              </p>
+              {esVenta && !esAnulacion && (
                 <button onClick={() => setVerVenta(true)}
                   className="text-xs text-blue-500 hover:text-blue-700 underline">
                   Ver detalle
@@ -40,17 +160,11 @@ function FilaMovimiento({ mov }) {
             </div>
           </div>
         </div>
-        <span className={`text-sm font-semibold ${esIngreso ? 'text-green-600' : 'text-red-600'}`}>
-          {esIngreso ? '+' : '-'}{formatCOP(mov.montoCop)}
+        <span className={`text-sm font-semibold ${esAnulacion ? 'text-red-700' : esIngreso ? 'text-green-600' : 'text-red-600'}`}>
+          {esIngreso && !esAnulacion ? '+' : '-'}{formatCOP(mov.montoCop)}
         </span>
       </div>
-
-      {verVenta && (
-        <ModalDetalleVenta
-          ventaId={mov.ventaId}
-          onClose={() => setVerVenta(false)}
-        />
-      )}
+      {verVenta && <ModalDetalleVenta ventaId={mov.ventaId} onClose={() => setVerVenta(false)} />}
     </>
   )
 }
@@ -427,6 +541,15 @@ export default function Caja() {
                   {cerrando ? 'Cerrando...' : 'Cerrar caja'}
                 </button>
               </form>
+              {/*Boton para generar PDF de cierre en previsualizacion*/} 
+              {/* {tab === 'cierre' && esDueno && cajaAbierta && sesion && (
+                  <button
+                    onClick={() => generarCierrePDF(sesion)}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                  >
+                    <Download size={14} /> Previsualizar PDF cierre
+                  </button>
+                )}*/}
             </div>
           )}
         </>
@@ -509,10 +632,18 @@ export default function Caja() {
                         {s.diferenciaCop >= 0 ? '+' : ''}{formatCOP(s.diferenciaCop)}
                       </td>
                       <td className="px-4 py-3">
-                        <button onClick={() => setSesionDetalle(s.id)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                          <Eye size={15} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => generarCierrePDF(s)}
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg"
+                            title="Descargar PDF">
+                            <Download size={15} />
+                          </button>
+                          <button onClick={() => setSesionDetalle(s.id)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                            title="Ver detalle">
+                            <Eye size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

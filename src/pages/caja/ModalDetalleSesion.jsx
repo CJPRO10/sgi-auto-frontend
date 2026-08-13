@@ -11,21 +11,25 @@ const getSesionPorId = (id) =>
 function FilaMovimiento({ mov }) {
   const [verVenta, setVerVenta] = useState(false)
   const esIngreso = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA', 'APERTURA', 'ABONO_CREDITO'].includes(mov.tipo)
+  const esAnulacion = mov.descripcion?.toLowerCase().includes('anulación') || 
+                      mov.descripcion?.toLowerCase().includes('anulacion')
   const esVenta = ['VENTA', 'VENTA_EFECTIVO', 'VENTA_TRANSFERENCIA'].includes(mov.tipo) && mov.ventaId
 
   return (
     <>
-      <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <div className={`flex items-center justify-between py-2 border-b border-gray-50 last:border-0 ${esAnulacion ? 'bg-red-50' : ''}`}>
         <div className="flex items-center gap-3">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${esIngreso ? 'bg-green-100' : 'bg-red-100'}`}>
-            {esIngreso
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center ${esAnulacion ? 'bg-red-200' : esIngreso ? 'bg-green-100' : 'bg-red-100'}`}>
+            {esIngreso && !esAnulacion
               ? <TrendingUp size={13} className="text-green-600" />
               : <TrendingDown size={13} className="text-red-600" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-gray-700">{mov.descripcion}</p>
-              {esVenta && (
+              <p className={`text-sm font-medium ${esAnulacion ? 'text-red-700' : 'text-gray-700'}`}>
+                {mov.descripcion}
+              </p>
+              {esVenta && !esAnulacion && (
                 <button onClick={() => setVerVenta(true)}
                   className="text-xs text-blue-500 hover:text-blue-700 underline">
                   Ver detalle
@@ -38,17 +42,11 @@ function FilaMovimiento({ mov }) {
             </div>
           </div>
         </div>
-        <span className={`text-sm font-semibold ${esIngreso ? 'text-green-600' : 'text-red-600'}`}>
-          {esIngreso ? '+' : '-'}{formatCOP(mov.montoCop)}
+        <span className={`text-sm font-semibold ${esAnulacion ? 'text-red-700' : esIngreso ? 'text-green-600' : 'text-red-600'}`}>
+          {esIngreso && !esAnulacion ? '+' : '-'}{formatCOP(mov.montoCop)}
         </span>
       </div>
-
-      {verVenta && (
-        <ModalDetalleVenta
-          ventaId={mov.ventaId}
-          onClose={() => setVerVenta(false)}
-        />
-      )}
+      {verVenta && <ModalDetalleVenta ventaId={mov.ventaId} onClose={() => setVerVenta(false)} />}
     </>
   )
 }
