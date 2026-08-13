@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProductos, buscarProductos, eliminarProducto } from '../../api/inventario'
 import { formatCOP } from '../../utils/formato'
-import { Search, Plus, Trash2, Edit2, AlertTriangle, Package } from 'lucide-react'
+import { Search, Plus, Trash2, Edit2, AlertTriangle, BarChart3, Package } from 'lucide-react'
 import ModalProducto from './ModalProducto'
+import ModalKardex from './ModalKardex'
 
 function BadgeStock({ stock, minimo }) {
   if (stock === 0)
@@ -19,6 +20,7 @@ export default function Inventario() {
   const [pagina, setPagina] = useState(0)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditando, setProductoEditando] = useState(null)
+  const [productoKardex, setProductoKardex] = useState(null)
 
   const { data, isLoading } = useQuery({
     queryKey: busqueda.length >= 2
@@ -151,6 +153,10 @@ export default function Inventario() {
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 size={15} />
                       </button>
+                      <button onClick={() => setProductoKardex(p)}
+                        className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                        <BarChart3 size={15} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -184,6 +190,12 @@ export default function Inventario() {
             setModalAbierto(false)
             queryClient.invalidateQueries(['productos'])
           }}
+        />
+      )}
+      {productoKardex && (
+        <ModalKardex
+          producto={productoKardex}
+          onClose={() => setProductoKardex(null)}
         />
       )}
     </div>

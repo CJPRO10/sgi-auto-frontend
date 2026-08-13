@@ -4,10 +4,11 @@ import { getProductos, buscarProductos } from '../../api/inventario'
 import { buscarClientes } from '../../api/clientes'
 import { crearVenta } from '../../api/pos'
 import { formatCOP } from '../../utils/formato'
-import { Search, Plus, Minus, Trash2, ShoppingCart, X, Package, DollarSign } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, Package, Download, DollarSign } from 'lucide-react'
 import { useDebounce } from '../../hooks/useDebounce'
 import {useNavigate } from 'react-router-dom'
 import useCajaStore from '../../store/cajaStore'
+import { jsPDF } from 'jspdf'
 
 const METODOS_PAGO = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -18,6 +19,84 @@ const METODOS_PAGO = [
 
 function generarUUID() {
   return crypto.randomUUID()
+}
+
+function generarFacturaPDF(venta, negocio = 'SGI-AUTO') {
+  const doc = new jsPDF()
+  const fmt = (n) => new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', minimumFractionDigits: 0
+  }).format(n || 0)
+
+  // Header
+  doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+  doc.text(negocio, 14, 20)
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+  doc.text('Almacén de repuestos y taller automotriz', 14, 27)
+  doc.line(14, 32, 196, 32)
+
+  // Info factura
+  doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+  doc.text(`FACTURA DE VENTA #${venta.id}`, 14, 40)
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+  doc.text(`Fecha: ${new Date(venta.creadoEn).toLocaleString('es-CO')}`, 14, 48)
+  doc.text(`Cliente: ${venta.nombreCliente || 'Cliente general'}`, 14, 55)
+  doc.text(`Método de pago: ${venta.metodoPago}`, 14, 62)
+  doc.line(14, 67, 196, 67)
+
+  // Productos
+  let y = 75
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 240, 240)
+  doc.rect(14, y - 5, 182, 7, 'F')
+  doc.text('Producto', 16, y)
+  doc.text('Cod.', 90, y)
+  doc.text('Cant.', 120, y)
+  doc.text('Precio', 140, y)
+  doc.text('Subtotal', 168, y)
+  y += 5
+
+  doc.setFont('helvetica', 'normal')
+  venta.items?.forEach((item) => {
+    if (y > 260) { doc.addPage(); y = 20 }
+    doc.text((item.nombreProducto || '').substring(0, 30), 16, y)
+    doc.text(item.codigoProducto || '', 90, y)
+    doc.text(String(item.cantidad), 120, y)
+    doc.text(fmt(item.precioUnitarioCop), 135, y)
+    doc.text(fmt(item.subtotalCop), 168, y)
+    y += 7
+  })
+
+  // Totales
+  y += 3
+  doc.line(14, y, 196, y); y += 7
+  if (venta.descuentoCop > 0) {
+    doc.text('Descuento:', 130, y)
+    doc.text(`-${fmt(venta.descuentoCop)}`, 168, y); y += 7
+  }
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text('TOTAL:', 130, y)
+  doc.text(fmt(venta.totalCop), 168, y); y += 8
+
+  if (venta.vueltoCop > 0) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
+    doc.text(`Vuelto: ${fmt(venta.vueltoCop)}`, 130, y); y += 7
+  }
+
+  if (venta.puntosGanados > 0) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
+    doc.setTextColor(180, 120, 0)
+    doc.text(`Puntos ganados: +${venta.puntosGanados}`, 14, y)
+    doc.setTextColor(0, 0, 0)
+  }
+
+  // Footer
+  doc.setFontSize(8); doc.setTextColor(150, 150, 150)
+  doc.text('Gracias por su compra — ' + negocio, 14, 285)
+  doc.text(`Factura #${venta.id}`, 170, 285)
+  doc.setTextColor(0, 0, 0)
+
+  doc.save(`factura-${venta.id}.pdf`)
 }
 
 export default function Pos() {
@@ -458,12 +537,20 @@ export default function Pos() {
                 ⭐ +{mensajeExito.puntosGanados} puntos ganados
               </p>
             )}
-            <button
-              onClick={() => setMensajeExito(null)}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
-            >
-              Nueva venta
-            </button>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => generarFacturaPDF(mensajeExito)}
+                className="flex-1 flex items-center justify-center gap-2 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium"
+              >
+                <Download size={14} /> Factura PDF
+              </button>
+              <button
+                onClick={() => setMensajeExito(null)}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+              >
+                Nueva venta
+              </button>
+            </div>
           </div>
         </div>
       )}
