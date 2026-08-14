@@ -3,17 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { getReporteVentas, getReporteInventario, getListaPrecios } from '../../api/reportes'
 import { formatCOP, formatFecha } from '../../utils/formato'
 import { jsPDF } from 'jspdf'
-import { BarChart3, Package, DollarSign, Download, Search } from 'lucide-react'
-
-
-
+import * as XLSX from 'xlsx'
+import { BarChart3, Package, DollarSign, Download, Search, FileSpreadsheet } from 'lucide-react'
 
 function pdfVentas(ventas, desde, hasta) {
   const doc = new jsPDF()
   const fmt = (n) => new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', minimumFractionDigits: 0
   }).format(n || 0)
-
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
   doc.text('SGI-AUTO — Reporte de Ventas', 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
@@ -22,18 +19,13 @@ function pdfVentas(ventas, desde, hasta) {
   const total = ventas.reduce((s, v) => s + (v.totalCop || 0), 0)
   doc.text(`Total ingresos: ${fmt(total)}`, 14, 42)
   doc.line(14, 46, 196, 46)
-
   let y = 54
   doc.setFont('helvetica', 'bold')
   doc.setFillColor(240, 240, 240)
   doc.rect(14, y - 5, 182, 7, 'F')
-  doc.text('Cliente', 16, y)
-  doc.text('Metodo', 80, y)
-  doc.text('Items', 120, y)
-  doc.text('Total', 145, y)
-  doc.text('Fecha', 170, y)
+  doc.text('Cliente', 16, y); doc.text('Metodo', 80, y)
+  doc.text('Items', 120, y); doc.text('Total', 145, y); doc.text('Fecha', 170, y)
   y += 5
-
   doc.setFont('helvetica', 'normal')
   ventas.forEach((v) => {
     if (y > 270) { doc.addPage(); y = 20 }
@@ -44,7 +36,6 @@ function pdfVentas(ventas, desde, hasta) {
     doc.text(v.fecha ? new Date(v.fecha).toLocaleDateString('es-CO') : '', 170, y)
     y += 7
   })
-
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
   doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0)
@@ -56,24 +47,18 @@ function pdfInventario(productos) {
   const fmt = (n) => new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', minimumFractionDigits: 0
   }).format(n || 0)
-
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
   doc.text('SGI-AUTO — Reporte de Inventario', 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
-
   let y = 42
   doc.setFont('helvetica', 'bold')
   doc.setFillColor(240, 240, 240)
   doc.rect(14, y - 5, 182, 7, 'F')
-  doc.text('Producto', 16, y)
-  doc.text('Stock', 100, y)
-  doc.text('Min', 120, y)
-  doc.text('Precio', 145, y)
-  doc.text('Estado', 175, y)
+  doc.text('Producto', 16, y); doc.text('Stock', 100, y)
+  doc.text('Min', 120, y); doc.text('Precio', 145, y); doc.text('Estado', 175, y)
   y += 5
-
   doc.setFont('helvetica', 'normal')
   productos.forEach((p) => {
     if (y > 270) { doc.addPage(); y = 20 }
@@ -86,7 +71,6 @@ function pdfInventario(productos) {
     doc.text(p.stockActual === 0 ? 'Agotado' : p.stockBajo ? 'Bajo' : 'OK', 175, y)
     y += 7
   })
-
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
   doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0)
@@ -98,22 +82,17 @@ function pdfListaPrecios(productos) {
   const fmt = (n) => new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', minimumFractionDigits: 0
   }).format(n || 0)
-
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
   doc.text('SGI-AUTO — Lista de Precios', 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
-
   let y = 42
   doc.setFont('helvetica', 'bold')
   doc.setFillColor(240, 240, 240)
   doc.rect(14, y - 5, 182, 7, 'F')
-  doc.text('Producto', 16, y)
-  doc.text('Codigo', 110, y)
-  doc.text('Precio', 155, y)
+  doc.text('Producto', 16, y); doc.text('Codigo', 110, y); doc.text('Precio', 155, y)
   y += 5
-
   doc.setFont('helvetica', 'normal')
   productos.forEach((p) => {
     if (y > 270) { doc.addPage(); y = 20 }
@@ -122,11 +101,52 @@ function pdfListaPrecios(productos) {
     doc.text(fmt(p.precioVentaDetal), 155, y)
     y += 7
   })
-
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
   doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0)
   doc.save('lista-precios.pdf')
+}
+
+function excelListaPrecios(productos) {
+  const fmt = (n) => new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', minimumFractionDigits: 0
+  }).format(n || 0)
+
+  const datos = productos.map((p) => ({
+    'Producto': p.nombre || '',
+    'Código': p.codigo || '',
+    'Categoría': p.categoriaNombre || '',
+    'Precio Detal': p.precioVentaDetal || 0,
+    'Precio Detal (COP)': fmt(p.precioVentaDetal),
+    'Precio Mayor': p.precioVentaMayor || 0,
+    'Precio Mayor (COP)': fmt(p.precioVentaMayor),
+  }))
+
+  const hoja = XLSX.utils.json_to_sheet(datos)
+
+  // Ancho de columnas
+  hoja['!cols'] = [
+    { wch: 40 }, // Producto
+    { wch: 15 }, // Código
+    { wch: 20 }, // Categoría
+    { wch: 15 }, // Precio Detal
+    { wch: 18 }, // Precio Detal COP
+    { wch: 15 }, // Precio Mayor
+    { wch: 18 }, // Precio Mayor COP
+  ]
+
+  const libro = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(libro, hoja, 'Lista de Precios')
+
+  // Hoja de info
+  const info = XLSX.utils.aoa_to_sheet([
+    ['SGI-AUTO — Lista de Precios'],
+    [`Generado: ${new Date().toLocaleString('es-CO')}`],
+    [`Total productos: ${productos.length}`],
+  ])
+  XLSX.utils.book_append_sheet(libro, info, 'Info')
+
+  XLSX.writeFile(libro, `lista-precios-${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 
 export default function Reportes() {
@@ -171,15 +191,11 @@ export default function Reportes() {
           { key: 'inventario', label: 'Inventario', icon: Package },
           { key: 'precios', label: 'Lista de precios', icon: BarChart3 },
         ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
+          <button key={key} onClick={() => setTab(key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Icon size={15} />
-            {label}
+            }`}>
+            <Icon size={15} />{label}
           </button>
         ))}
       </div>
@@ -190,33 +206,23 @@ export default function Reportes() {
           <div className="flex items-end gap-3 flex-wrap">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
-              <input
-                type="date"
-                value={desde}
+              <input type="date" value={desde}
                 onChange={(e) => { setDesde(e.target.value); setBuscar(0) }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
-              <input
-                type="date"
-                value={hasta}
+              <input type="date" value={hasta}
                 onChange={(e) => { setHasta(e.target.value); setBuscar(0) }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <button
-              onClick={() => setBuscar((n) => n + 1)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
-            >
+            <button onClick={() => setBuscar((n) => n + 1)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
               <Search size={14} /> Generar
             </button>
             {ventas.length > 0 && (
-              <button
-                onClick={() => pdfVentas(ventas, desde, hasta)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium"
-              >
+              <button onClick={() => pdfVentas(ventas, desde, hasta)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium">
                 <Download size={14} /> PDF
               </button>
             )}
@@ -248,7 +254,6 @@ export default function Reportes() {
                   </p>
                 </div>
               </div>
-
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -286,10 +291,8 @@ export default function Reportes() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-700">Reporte de inventario</h2>
             {inventario.length > 0 && (
-              <button
-                onClick={() => pdfInventario(inventario)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium"
-              >
+              <button onClick={() => pdfInventario(inventario)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium">
                 <Download size={14} /> PDF
               </button>
             )}
@@ -327,8 +330,7 @@ export default function Reportes() {
                         ? <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">Agotado</span>
                         : p.stockBajo
                           ? <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">Stock bajo</span>
-                          : <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">OK</span>
-                      }
+                          : <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">OK</span>}
                     </td>
                   </tr>
                 ))}
@@ -344,12 +346,16 @@ export default function Reportes() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-700">Lista de precios</h2>
             {listaPrecios.length > 0 && (
-              <button
-                onClick={() => pdfListaPrecios(listaPrecios)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium"
-              >
-                <Download size={14} /> PDF
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => pdfListaPrecios(listaPrecios)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium">
+                  <Download size={14} /> PDF
+                </button>
+                <button onClick={() => excelListaPrecios(listaPrecios)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+                  <FileSpreadsheet size={14} /> Excel
+                </button>
+              </div>
             )}
           </div>
           {!listaPreciosData ? (
