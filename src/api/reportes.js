@@ -11,3 +11,6 @@ export const getReporteTaller = () =>
 
 export const getListaPrecios = () =>
   api.get('/reportes/lista-precios')
+
+export const getProductosSinMovimiento = (dias = 30) =>
+  api.get(`/reportes/productos-sin-movimiento?dias=${dias}`)

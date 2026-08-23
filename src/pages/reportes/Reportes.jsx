@@ -1,16 +1,24 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getReporteVentas, getReporteInventario, getListaPrecios } from '../../api/reportes'
-import { formatCOP, formatFecha } from '../../utils/formato'
+import {
+  getReporteVentas, getReporteInventario, getListaPrecios,
+  getReporteTaller, getProductosSinMovimiento
+} from '../../api/reportes'
+import { getClientes } from '../../api/clientes'
+import { formatCOP, formatFecha, formatFechaCorta } from '../../utils/formato'
 import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
-import { BarChart3, Package, DollarSign, Download, Search, FileSpreadsheet } from 'lucide-react'
+import {
+  BarChart3, Package, DollarSign, Download, Search,
+  FileSpreadsheet, CreditCard, Wrench, AlertTriangle
+} from 'lucide-react'
+
+const fmt = (n) => new Intl.NumberFormat('es-CO', {
+  style: 'currency', currency: 'COP', minimumFractionDigits: 0
+}).format(n || 0)
 
 function pdfVentas(ventas, desde, hasta) {
   const doc = new jsPDF()
-  const fmt = (n) => new Intl.NumberFormat('es-CO', {
-    style: 'currency', currency: 'COP', minimumFractionDigits: 0
-  }).format(n || 0)
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
   doc.text('SGI-AUTO — Reporte de Ventas', 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
@@ -20,13 +28,11 @@ function pdfVentas(ventas, desde, hasta) {
   doc.text(`Total ingresos: ${fmt(total)}`, 14, 42)
   doc.line(14, 46, 196, 46)
   let y = 54
-  doc.setFont('helvetica', 'bold')
-  doc.setFillColor(240, 240, 240)
+  doc.setFont('helvetica', 'bold'); doc.setFillColor(240, 240, 240)
   doc.rect(14, y - 5, 182, 7, 'F')
   doc.text('Cliente', 16, y); doc.text('Metodo', 80, y)
   doc.text('Items', 120, y); doc.text('Total', 145, y); doc.text('Fecha', 170, y)
-  y += 5
-  doc.setFont('helvetica', 'normal')
+  y += 5; doc.setFont('helvetica', 'normal')
   ventas.forEach((v) => {
     if (y > 270) { doc.addPage(); y = 20 }
     doc.text((v.nombreCliente || 'Ocasional').substring(0, 25), 16, y)
@@ -44,22 +50,17 @@ function pdfVentas(ventas, desde, hasta) {
 
 function pdfInventario(productos) {
   const doc = new jsPDF()
-  const fmt = (n) => new Intl.NumberFormat('es-CO', {
-    style: 'currency', currency: 'COP', minimumFractionDigits: 0
-  }).format(n || 0)
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
   doc.text('SGI-AUTO — Reporte de Inventario', 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
   let y = 42
-  doc.setFont('helvetica', 'bold')
-  doc.setFillColor(240, 240, 240)
+  doc.setFont('helvetica', 'bold'); doc.setFillColor(240, 240, 240)
   doc.rect(14, y - 5, 182, 7, 'F')
   doc.text('Producto', 16, y); doc.text('Stock', 100, y)
   doc.text('Min', 120, y); doc.text('Precio', 145, y); doc.text('Estado', 175, y)
-  y += 5
-  doc.setFont('helvetica', 'normal')
+  y += 5; doc.setFont('helvetica', 'normal')
   productos.forEach((p) => {
     if (y > 270) { doc.addPage(); y = 20 }
     p.stockBajo ? doc.setTextColor(220, 38, 38) : doc.setTextColor(0, 0, 0)
@@ -73,27 +74,21 @@ function pdfInventario(productos) {
   })
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
   doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
-  doc.setTextColor(0, 0, 0)
-  doc.save('inventario.pdf')
+  doc.setTextColor(0, 0, 0); doc.save('inventario.pdf')
 }
 
 function pdfListaPrecios(productos) {
   const doc = new jsPDF()
-  const fmt = (n) => new Intl.NumberFormat('es-CO', {
-    style: 'currency', currency: 'COP', minimumFractionDigits: 0
-  }).format(n || 0)
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
   doc.text('SGI-AUTO — Lista de Precios', 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
   let y = 42
-  doc.setFont('helvetica', 'bold')
-  doc.setFillColor(240, 240, 240)
+  doc.setFont('helvetica', 'bold'); doc.setFillColor(240, 240, 240)
   doc.rect(14, y - 5, 182, 7, 'F')
   doc.text('Producto', 16, y); doc.text('Codigo', 110, y); doc.text('Precio', 155, y)
-  y += 5
-  doc.setFont('helvetica', 'normal')
+  y += 5; doc.setFont('helvetica', 'normal')
   productos.forEach((p) => {
     if (y > 270) { doc.addPage(); y = 20 }
     doc.text((p.nombre || '').substring(0, 45), 16, y)
@@ -103,15 +98,10 @@ function pdfListaPrecios(productos) {
   })
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
   doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
-  doc.setTextColor(0, 0, 0)
-  doc.save('lista-precios.pdf')
+  doc.setTextColor(0, 0, 0); doc.save('lista-precios.pdf')
 }
 
 function excelListaPrecios(productos) {
-  const fmt = (n) => new Intl.NumberFormat('es-CO', {
-    style: 'currency', currency: 'COP', minimumFractionDigits: 0
-  }).format(n || 0)
-
   const datos = productos.map((p) => ({
     'Producto': p.nombre || '',
     'Código': p.codigo || '',
@@ -121,32 +111,117 @@ function excelListaPrecios(productos) {
     'Precio Mayor': p.precioVentaMayor || 0,
     'Precio Mayor (COP)': fmt(p.precioVentaMayor),
   }))
-
   const hoja = XLSX.utils.json_to_sheet(datos)
-
-  // Ancho de columnas
-  hoja['!cols'] = [
-    { wch: 40 }, // Producto
-    { wch: 15 }, // Código
-    { wch: 20 }, // Categoría
-    { wch: 15 }, // Precio Detal
-    { wch: 18 }, // Precio Detal COP
-    { wch: 15 }, // Precio Mayor
-    { wch: 18 }, // Precio Mayor COP
-  ]
-
+  hoja['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 18 }]
   const libro = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(libro, hoja, 'Lista de Precios')
-
-  // Hoja de info
   const info = XLSX.utils.aoa_to_sheet([
     ['SGI-AUTO — Lista de Precios'],
     [`Generado: ${new Date().toLocaleString('es-CO')}`],
     [`Total productos: ${productos.length}`],
   ])
   XLSX.utils.book_append_sheet(libro, info, 'Info')
-
   XLSX.writeFile(libro, `lista-precios-${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+
+function pdfCreditos(clientes) {
+  const doc = new jsPDF()
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+  doc.text('SGI-AUTO — Reporte de Créditos', 14, 20)
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+  doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
+  const totalDeuda = clientes.reduce((s, c) => s + (c.saldoCreditoCop || 0), 0)
+  doc.text(`Total por cobrar: ${fmt(totalDeuda)}`, 14, 35)
+  doc.line(14, 39, 196, 39)
+  let y = 47
+  doc.setFont('helvetica', 'bold'); doc.setFillColor(240, 240, 240)
+  doc.rect(14, y - 5, 182, 7, 'F')
+  doc.text('Cliente', 16, y); doc.text('Identificación', 80, y)
+  doc.text('Total deuda', 120, y); doc.text('Saldo pendiente', 158, y)
+  y += 5; doc.setFont('helvetica', 'normal')
+  clientes.forEach((c) => {
+    if (y > 270) { doc.addPage(); y = 20 }
+    doc.text((c.nombreCompleto || '').substring(0, 30), 16, y)
+    doc.text(`${c.tipoIdentificacion} ${c.numeroIdentificacion}`, 80, y)
+    doc.text(fmt(c.cupoCreditoCop), 120, y)
+    doc.setTextColor(220, 38, 38)
+    doc.text(fmt(c.saldoCreditoCop), 158, y)
+    doc.setTextColor(0, 0, 0)
+    y += 7
+  })
+  doc.setFontSize(8); doc.setTextColor(150, 150, 150)
+  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.setTextColor(0, 0, 0); doc.save('reporte-creditos.pdf')
+}
+
+function pdfMecanicos(ots) {
+  const doc = new jsPDF()
+  const porMecanico = {}
+  ots.forEach((ot) => {
+    const nombre = ot.mecanicoNombre || 'Sin asignar'
+    if (!porMecanico[nombre]) porMecanico[nombre] = { ots: 0, total: 0 }
+    porMecanico[nombre].ots++
+    porMecanico[nombre].total += ot.granTotalCop || 0
+  })
+
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+  doc.text('SGI-AUTO — Reporte de Mecánicos', 14, 20)
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+  doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
+  doc.line(14, 32, 196, 32)
+
+  let y = 42
+  doc.setFont('helvetica', 'bold'); doc.setFillColor(240, 240, 240)
+  doc.rect(14, y - 5, 182, 7, 'F')
+  doc.text('Mecánico', 16, y); doc.text('OTs', 110, y)
+  doc.text('Total facturado', 135, y); doc.text('Promedio/OT', 170, y)
+  y += 5; doc.setFont('helvetica', 'normal')
+
+  Object.entries(porMecanico).forEach(([nombre, datos]) => {
+    if (y > 270) { doc.addPage(); y = 20 }
+    const promedio = datos.ots > 0 ? datos.total / datos.ots : 0
+    doc.text(nombre.substring(0, 35), 16, y)
+    doc.text(String(datos.ots), 110, y)
+    doc.text(fmt(datos.total), 130, y)
+    doc.text(fmt(promedio), 168, y)
+    y += 7
+  })
+
+  doc.setFontSize(8); doc.setTextColor(150, 150, 150)
+  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.setTextColor(0, 0, 0); doc.save('reporte-mecanicos.pdf')
+}
+
+function pdfSinMovimiento(productos, dias) {
+  const doc = new jsPDF()
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+  doc.text('SGI-AUTO — Productos Sin Movimiento', 14, 20)
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+  doc.text(`Sin movimiento en los últimos ${dias} días`, 14, 28)
+  const totalInmovilizado = productos.reduce((s, p) => s + (p.valorInmovilizadoCop || 0), 0)
+  doc.text(`Total inmovilizado: ${fmt(totalInmovilizado)}`, 14, 35)
+  doc.line(14, 39, 196, 39)
+
+  let y = 47
+  doc.setFont('helvetica', 'bold'); doc.setFillColor(240, 240, 240)
+  doc.rect(14, y - 5, 182, 7, 'F')
+  doc.text('Producto', 16, y); doc.text('Categoría', 85, y)
+  doc.text('Stock', 125, y); doc.text('Valor', 145, y); doc.text('Último mov.', 170, y)
+  y += 5; doc.setFont('helvetica', 'normal')
+
+  productos.forEach((p) => {
+    if (y > 270) { doc.addPage(); y = 20 }
+    doc.text((p.nombre || '').substring(0, 30), 16, y)
+    doc.text((p.categoria || '').substring(0, 18), 85, y)
+    doc.text(String(p.stockActual), 128, y)
+    doc.text(fmt(p.valorInmovilizadoCop), 143, y)
+    doc.text(p.ultimoMovimiento ? formatFechaCorta(p.ultimoMovimiento) : 'Nunca', 170, y)
+    y += 7
+  })
+
+  doc.setFontSize(8); doc.setTextColor(150, 150, 150)
+  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.setTextColor(0, 0, 0); doc.save(`productos-sin-movimiento-${dias}dias.pdf`)
 }
 
 export default function Reportes() {
@@ -154,6 +229,7 @@ export default function Reportes() {
   const [desde, setDesde] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0])
   const [hasta, setHasta] = useState(new Date().toISOString().split('T')[0])
   const [buscar, setBuscar] = useState(0)
+  const [diasSinMovimiento, setDiasSinMovimiento] = useState(30)
 
   const { data: ventasData, isLoading: cargandoVentas } = useQuery({
     queryKey: ['reporte-ventas', desde, hasta, buscar],
@@ -173,10 +249,56 @@ export default function Reportes() {
     enabled: Boolean(tab === 'precios'),
   })
 
+  const { data: clientesData } = useQuery({
+    queryKey: ['reporte-creditos'],
+    queryFn: () => getClientes(0, 200).then((r) => r.data.datos?.content || []),
+    enabled: Boolean(tab === 'creditos'),
+  })
+
+  const { data: tallerData } = useQuery({
+    queryKey: ['reporte-taller'],
+    queryFn: () => getReporteTaller().then((r) => r.data.datos),
+    enabled: Boolean(tab === 'mecanicos'),
+  })
+
+  const { data: sinMovimientoData, isLoading: cargandoSinMovimiento } = useQuery({
+    queryKey: ['reporte-sin-movimiento', diasSinMovimiento],
+    queryFn: () => getProductosSinMovimiento(diasSinMovimiento).then((r) => r.data.datos),
+    enabled: Boolean(tab === 'sin-movimiento'),
+  })
+
   const ventas = ventasData?.content || ventasData || []
   const inventario = inventarioData || []
   const listaPrecios = listaPreciosData || []
-  const fmt = (n) => formatCOP(n || 0)
+  const clientesCredito = (clientesData || []).filter((c) => c.creditoHabilitado && c.saldoCreditoCop > 0)
+  const totalDeuda = clientesCredito.reduce((s, c) => s + (c.saldoCreditoCop || 0), 0)
+  const otsAll = tallerData || []
+  const productosSinMovimiento = sinMovimientoData || []
+  const totalInmovilizado = productosSinMovimiento.reduce((s, p) => s + (p.valorInmovilizadoCop || 0), 0)
+
+  // Agrupar OTs por mecánico
+  const porMecanico = {}
+  otsAll.forEach((ot) => {
+    const nombre = ot.mecanicoNombre || 'Sin asignar'
+    if (!porMecanico[nombre]) porMecanico[nombre] = { ots: 0, total: 0, entregadas: 0 }
+    porMecanico[nombre].ots++
+    porMecanico[nombre].total += ot.granTotalCop || 0
+    if (ot.estado === 'ENTREGADO') porMecanico[nombre].entregadas++
+  })
+  const mecanicos = Object.entries(porMecanico).map(([nombre, d]) => ({
+    nombre, ...d, promedio: d.ots > 0 ? d.total / d.ots : 0
+  }))
+
+  const fmtCOP = (n) => formatCOP(n || 0)
+
+  const TABS = [
+    { key: 'ventas', label: 'Ventas', icon: DollarSign },
+    { key: 'inventario', label: 'Inventario', icon: Package },
+    { key: 'precios', label: 'Lista de precios', icon: BarChart3 },
+    { key: 'creditos', label: 'Créditos', icon: CreditCard },
+    { key: 'mecanicos', label: 'Mecánicos', icon: Wrench },
+    { key: 'sin-movimiento', label: 'Sin movimiento', icon: AlertTriangle },
+  ]
 
   return (
     <div className="p-6 space-y-6">
@@ -185,12 +307,8 @@ export default function Reportes() {
         <p className="text-gray-500 text-sm mt-1">Análisis y exportación de datos</p>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-200">
-        {[
-          { key: 'ventas', label: 'Ventas', icon: DollarSign },
-          { key: 'inventario', label: 'Inventario', icon: Package },
-          { key: 'precios', label: 'Lista de precios', icon: BarChart3 },
-        ].map(({ key, label, icon: Icon }) => (
+      <div className="flex gap-1 border-b border-gray-200 flex-wrap">
+        {TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -206,14 +324,12 @@ export default function Reportes() {
           <div className="flex items-end gap-3 flex-wrap">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
-              <input type="date" value={desde}
-                onChange={(e) => { setDesde(e.target.value); setBuscar(0) }}
+              <input type="date" value={desde} onChange={(e) => { setDesde(e.target.value); setBuscar(0) }}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Hasta</label>
-              <input type="date" value={hasta}
-                onChange={(e) => { setHasta(e.target.value); setBuscar(0) }}
+              <input type="date" value={hasta} onChange={(e) => { setHasta(e.target.value); setBuscar(0) }}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <button onClick={() => setBuscar((n) => n + 1)}
@@ -227,13 +343,7 @@ export default function Reportes() {
               </button>
             )}
           </div>
-
-          {cargandoVentas && (
-            <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-
+          {cargandoVentas && <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}
           {ventas.length > 0 && !cargandoVentas && (
             <>
               <div className="grid grid-cols-3 gap-4">
@@ -243,15 +353,11 @@ export default function Reportes() {
                 </div>
                 <div className="bg-green-50 rounded-lg p-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Ingresos</p>
-                  <p className="text-xl font-bold text-green-700">
-                    {fmt(ventas.reduce((s, v) => s + (v.totalCop || 0), 0))}
-                  </p>
+                  <p className="text-xl font-bold text-green-700">{fmtCOP(ventas.reduce((s, v) => s + (v.totalCop || 0), 0))}</p>
                 </div>
                 <div className="bg-blue-50 rounded-lg p-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Ticket promedio</p>
-                  <p className="text-xl font-bold text-blue-700">
-                    {fmt(ventas.reduce((s, v) => s + (v.totalCop || 0), 0) / ventas.length)}
-                  </p>
+                  <p className="text-xl font-bold text-blue-700">{fmtCOP(ventas.reduce((s, v) => s + (v.totalCop || 0), 0) / ventas.length)}</p>
                 </div>
               </div>
               <table className="w-full">
@@ -270,7 +376,7 @@ export default function Reportes() {
                       <td className="px-4 py-3 text-sm">{v.nombreCliente || 'Ocasional'}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{v.metodoPago}</td>
                       <td className="px-4 py-3 text-center text-sm">{v.cantidadItems}</td>
-                      <td className="px-4 py-3 text-right text-sm font-medium">{fmt(v.totalCop)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-medium">{fmtCOP(v.totalCop)}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{formatFecha(v.fecha)}</td>
                     </tr>
                   ))}
@@ -278,7 +384,6 @@ export default function Reportes() {
               </table>
             </>
           )}
-
           {buscar > 0 && !cargandoVentas && ventas.length === 0 && (
             <p className="text-gray-400 text-sm text-center py-8">Sin ventas en ese período</p>
           )}
@@ -298,9 +403,7 @@ export default function Reportes() {
             )}
           </div>
           {!inventarioData ? (
-            <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            </div>
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
           ) : inventario.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-8">Sin productos</p>
           ) : (
@@ -320,11 +423,9 @@ export default function Reportes() {
                   <tr key={i} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-800">{p.nombre}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{p.categoria || '—'}</td>
-                    <td className={`px-4 py-3 text-center text-sm font-bold ${p.stockActual === 0 ? 'text-red-600' : p.stockBajo ? 'text-yellow-600' : 'text-gray-800'}`}>
-                      {p.stockActual}
-                    </td>
+                    <td className={`px-4 py-3 text-center text-sm font-bold ${p.stockActual === 0 ? 'text-red-600' : p.stockBajo ? 'text-yellow-600' : 'text-gray-800'}`}>{p.stockActual}</td>
                     <td className="px-4 py-3 text-center text-sm text-gray-500">{p.stockMinimo}</td>
-                    <td className="px-4 py-3 text-right text-sm">{fmt(p.precioVentaDetal)}</td>
+                    <td className="px-4 py-3 text-right text-sm">{fmtCOP(p.precioVentaDetal)}</td>
                     <td className="px-4 py-3 text-center">
                       {p.stockActual === 0
                         ? <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">Agotado</span>
@@ -359,9 +460,7 @@ export default function Reportes() {
             )}
           </div>
           {!listaPreciosData ? (
-            <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            </div>
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
           ) : listaPrecios.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-8">No hay productos en la lista de precios</p>
           ) : (
@@ -380,11 +479,202 @@ export default function Reportes() {
                     <td className="px-4 py-3 text-sm font-medium text-gray-800">{p.nombre}</td>
                     <td className="px-4 py-3 text-sm font-mono text-gray-500">{p.codigo}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{p.categoriaNombre || '—'}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold">{fmt(p.precioVentaDetal)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold">{fmtCOP(p.precioVentaDetal)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {/* Tab créditos */}
+      {tab === 'creditos' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-gray-700">Cartera de créditos</h2>
+            {clientesCredito.length > 0 && (
+              <button onClick={() => pdfCreditos(clientesCredito)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium">
+                <Download size={14} /> PDF
+              </button>
+            )}
+          </div>
+
+          {!clientesData ? (
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+          ) : clientesCredito.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-8">No hay créditos activos</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Clientes con crédito</p>
+                  <p className="text-2xl font-bold text-gray-800">{clientesCredito.length}</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Total por cobrar</p>
+                  <p className="text-xl font-bold text-red-700">{fmtCOP(totalDeuda)}</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Promedio por cliente</p>
+                  <p className="text-xl font-bold text-blue-700">{fmtCOP(totalDeuda / clientesCredito.length)}</p>
+                </div>
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Cliente</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Identificación</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Total deuda</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Saldo pendiente</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {[...clientesCredito].sort((a, b) => b.saldoCreditoCop - a.saldoCreditoCop).map((c) => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800">{c.nombreCompleto}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{c.tipoIdentificacion} {c.numeroIdentificacion}</td>
+                      <td className="px-4 py-3 text-right text-sm">{fmtCOP(c.cupoCreditoCop)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-red-600">{fmtCOP(c.saldoCreditoCop)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Tab mecánicos */}
+      {tab === 'mecanicos' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-gray-700">Rendimiento por mecánico</h2>
+            {mecanicos.length > 0 && (
+              <button onClick={() => pdfMecanicos(otsAll)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium">
+                <Download size={14} /> PDF
+              </button>
+            )}
+          </div>
+
+          {!tallerData ? (
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+          ) : mecanicos.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-8">Sin datos de mecánicos</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Total OTs</p>
+                  <p className="text-2xl font-bold text-gray-800">{otsAll.length}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Total facturado</p>
+                  <p className="text-xl font-bold text-green-700">{fmtCOP(otsAll.reduce((s, o) => s + (o.granTotalCop || 0), 0))}</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Mecánicos activos</p>
+                  <p className="text-2xl font-bold text-blue-700">{mecanicos.filter(m => m.nombre !== 'Sin asignar').length}</p>
+                </div>
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Mecánico</th>
+                    <th className="text-center text-xs font-semibold text-gray-500 uppercase px-4 py-2">OTs totales</th>
+                    <th className="text-center text-xs font-semibold text-gray-500 uppercase px-4 py-2">Entregadas</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Total facturado</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Promedio/OT</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {[...mecanicos].sort((a, b) => b.total - a.total).map((m, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800">{m.nombre}</td>
+                      <td className="px-4 py-3 text-center text-sm">{m.ots}</td>
+                      <td className="px-4 py-3 text-center text-sm text-green-600 font-medium">{m.entregadas}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold">{fmtCOP(m.total)}</td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-500">{fmtCOP(m.promedio)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Tab productos sin movimiento */}
+      {tab === 'sin-movimiento' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <div className="flex items-end justify-between flex-wrap gap-3">
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Días sin movimiento</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={diasSinMovimiento}
+                  onChange={(e) => setDiasSinMovimiento(Math.max(1, Number(e.target.value) || 1))}
+                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            {productosSinMovimiento.length > 0 && (
+              <button onClick={() => pdfSinMovimiento(productosSinMovimiento, diasSinMovimiento)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm font-medium">
+                <Download size={14} /> PDF
+              </button>
+            )}
+          </div>
+
+          {cargandoSinMovimiento ? (
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+          ) : productosSinMovimiento.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-8">
+              No hay productos sin movimiento en los últimos {diasSinMovimiento} días
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Productos sin movimiento</p>
+                  <p className="text-2xl font-bold text-gray-800">{productosSinMovimiento.length}</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Valor inmovilizado</p>
+                  <p className="text-xl font-bold text-yellow-700">{fmtCOP(totalInmovilizado)}</p>
+                </div>
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Producto</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Categoría</th>
+                    <th className="text-center text-xs font-semibold text-gray-500 uppercase px-4 py-2">Stock</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-2">Valor inmov.</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-2">Último movimiento</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {productosSinMovimiento.map((p, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800">{p.nombre}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{p.categoria || '—'}</td>
+                      <td className="px-4 py-3 text-center text-sm">{p.stockActual}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-yellow-700">{fmtCOP(p.valorInmovilizadoCop)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {p.ultimoMovimiento
+                          ? `${formatFechaCorta(p.ultimoMovimiento)} (${p.diasSinMovimiento} días)`
+                          : <span className="text-red-600 font-medium">Nunca</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       )}
