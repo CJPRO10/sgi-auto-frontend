@@ -9,6 +9,7 @@ import useAuthStore from '../../store/authStore'
 import ModalDetalleSesion from './ModalDetalleSesion'
 import ModalDetalleVenta from './ModalDetalleVenta'
 import { jsPDF } from 'jspdf'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 
 function generarCierrePDF(sesion) {
   const doc = new jsPDF()
@@ -17,7 +18,7 @@ function generarCierrePDF(sesion) {
   }).format(n || 0)
 
   doc.setFontSize(18); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO', 14, 20)
+  doc.text(NOMBRE_NEGOCIO, 14, 20)
   doc.setFontSize(11); doc.setFont('helvetica', 'normal')
   doc.text('Reporte de Cierre de Caja', 14, 28)
   doc.line(14, 32, 196, 32)
@@ -117,7 +118,7 @@ function generarCierrePDF(sesion) {
   }
 
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0)
 
   const fecha = sesion.cerradaEn

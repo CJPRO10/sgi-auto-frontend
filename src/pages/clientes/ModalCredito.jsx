@@ -4,6 +4,7 @@ import { getCreditoCliente, registrarAbono, agregarDeuda } from '../../api/clien
 import { formatCOP, formatFecha } from '../../utils/formato'
 import { X, CreditCard } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 
 const fmt = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0
@@ -18,7 +19,7 @@ function generarPDF(credito, cliente) {
   // Header
   doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO', 14, 20)
+  doc.text(NOMBRE_NEGOCIO, 14, 20)
   doc.setFontSize(11)
   doc.setFont('helvetica', 'normal')
   doc.text('Reporte de Credito', 14, 28)
@@ -124,7 +125,7 @@ function generarPDF(credito, cliente) {
     doc.setPage(i)
     doc.setFontSize(8)
     doc.setTextColor(150, 150, 150)
-    doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+    doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
     doc.text('Pagina ' + i + ' de ' + total, 175, 290)
     doc.setTextColor(0, 0, 0)
   }

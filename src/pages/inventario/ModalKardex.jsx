@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { formatCOP, formatFecha } from '../../utils/formato'
 import { X, TrendingUp, TrendingDown, Download } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 import api from '../../api/axios'
 
 const getKardex = (id, pagina = 0) =>
@@ -25,7 +26,7 @@ function generarPDFKardex(producto, movimientos) {
     : '—'
 
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Kardex de Producto', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Kardex de Producto`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Producto: ${producto.nombre}`, 14, 28)
   doc.text(`Código: ${producto.codigo}`, 14, 34)
@@ -58,7 +59,7 @@ function generarPDFKardex(producto, movimientos) {
   })
 
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0)
   doc.save(`kardex-${producto.codigo}.pdf`)
 }

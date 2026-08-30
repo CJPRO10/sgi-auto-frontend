@@ -12,6 +12,7 @@ import {
   BarChart3, Package, DollarSign, Download, Search,
   FileSpreadsheet, CreditCard, Wrench, AlertTriangle
 } from 'lucide-react'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 
 const fmt = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0
@@ -20,7 +21,7 @@ const fmt = (n) => new Intl.NumberFormat('es-CO', {
 function pdfVentas(ventas, desde, hasta) {
   const doc = new jsPDF()
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Reporte de Ventas', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Reporte de Ventas`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Periodo: ${desde} al ${hasta}`, 14, 28)
   doc.text(`Total ventas: ${ventas.length}`, 14, 35)
@@ -43,7 +44,7 @@ function pdfVentas(ventas, desde, hasta) {
     y += 7
   })
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0)
   doc.save(`ventas-${desde}-${hasta}.pdf`)
 }
@@ -51,7 +52,7 @@ function pdfVentas(ventas, desde, hasta) {
 function pdfInventario(productos) {
   const doc = new jsPDF()
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Reporte de Inventario', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Reporte de Inventario`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
@@ -73,14 +74,14 @@ function pdfInventario(productos) {
     y += 7
   })
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0); doc.save('inventario.pdf')
 }
 
 function pdfListaPrecios(productos) {
   const doc = new jsPDF()
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Lista de Precios', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Lista de Precios`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
@@ -97,7 +98,7 @@ function pdfListaPrecios(productos) {
     y += 7
   })
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0); doc.save('lista-precios.pdf')
 }
 
@@ -116,7 +117,7 @@ function excelListaPrecios(productos) {
   const libro = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(libro, hoja, 'Lista de Precios')
   const info = XLSX.utils.aoa_to_sheet([
-    ['SGI-AUTO — Lista de Precios'],
+    [`${NOMBRE_NEGOCIO} — Lista de Precios`],
     [`Generado: ${new Date().toLocaleString('es-CO')}`],
     [`Total productos: ${productos.length}`],
   ])
@@ -127,7 +128,7 @@ function excelListaPrecios(productos) {
 function pdfCreditos(clientes) {
   const doc = new jsPDF()
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Reporte de Créditos', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Reporte de Créditos`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   const totalDeuda = clientes.reduce((s, c) => s + (c.saldoCreditoCop || 0), 0)
@@ -150,7 +151,7 @@ function pdfCreditos(clientes) {
     y += 7
   })
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0); doc.save('reporte-creditos.pdf')
 }
 
@@ -165,7 +166,7 @@ function pdfMecanicos(ots) {
   })
 
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Reporte de Mecánicos', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Reporte de Mecánicos`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 14, 28)
   doc.line(14, 32, 196, 32)
@@ -188,14 +189,14 @@ function pdfMecanicos(ots) {
   })
 
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0); doc.save('reporte-mecanicos.pdf')
 }
 
 function pdfSinMovimiento(productos, dias) {
   const doc = new jsPDF()
   doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO — Productos Sin Movimiento', 14, 20)
+  doc.text(`${NOMBRE_NEGOCIO} — Productos Sin Movimiento`, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text(`Sin movimiento en los últimos ${dias} días`, 14, 28)
   const totalInmovilizado = productos.reduce((s, p) => s + (p.valorInmovilizadoCop || 0), 0)
@@ -220,7 +221,7 @@ function pdfSinMovimiento(productos, dias) {
   })
 
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO — ' + new Date().toLocaleDateString('es-CO'), 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO} — ` + new Date().toLocaleDateString('es-CO'), 14, 290)
   doc.setTextColor(0, 0, 0); doc.save(`productos-sin-movimiento-${dias}dias.pdf`)
 }
 

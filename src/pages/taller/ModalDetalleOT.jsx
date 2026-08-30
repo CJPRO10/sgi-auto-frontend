@@ -5,6 +5,7 @@ import { getProductos } from '../../api/inventario'
 import { formatCOP, formatFecha } from '../../utils/formato'
 import { X, ChevronRight, Plus, Download } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 
 const ESTADOS_SIGUIENTES = {
   RECIBIDO: 'EN_DIAGNOSTICO',
@@ -30,7 +31,7 @@ function generarPlanillaOT(ot) {
 
   // Header
   doc.setFontSize(18); doc.setFont('helvetica', 'bold')
-  doc.text('SGI-AUTO', 14, 20)
+  doc.text(NOMBRE_NEGOCIO, 14, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   doc.text('Taller automotriz', 14, 27)
   doc.setFontSize(14); doc.setFont('helvetica', 'bold')
@@ -151,7 +152,7 @@ function generarPlanillaOT(ot) {
   doc.text('Firma del mecánico', 142, y)
 
   doc.setFontSize(8); doc.setTextColor(150, 150, 150)
-  doc.text('Generado por SGI-AUTO', 14, 290)
+  doc.text(`Generado por ${NOMBRE_NEGOCIO}`, 14, 290)
   doc.setTextColor(0, 0, 0)
 
   doc.save(`OT-${ot.id}-${ot.placa}.pdf`)

@@ -9,6 +9,7 @@ import { useDebounce } from '../../hooks/useDebounce'
 import {useNavigate } from 'react-router-dom'
 import useCajaStore from '../../store/cajaStore'
 import { jsPDF } from 'jspdf'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 
 const METODOS_PAGO = [
   { value: 'EFECTIVO', label: 'Efectivo' },
@@ -21,17 +22,34 @@ function generarUUID() {
   return crypto.randomUUID()
 }
 
-function generarFacturaPDF(venta, negocio = 'SGI-AUTO') {
+function cargarLogoDataUrl() {
+  return new Promise((resolve, reject) => {
+    const imagen = new Image()
+    imagen.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = imagen.naturalWidth
+      canvas.height = imagen.naturalHeight
+      canvas.getContext('2d').drawImage(imagen, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    imagen.onerror = reject
+    imagen.src = '/logo-db.png'
+  })
+}
+
+async function generarFacturaPDF(venta, negocio = NOMBRE_NEGOCIO) {
   const doc = new jsPDF()
   const fmt = (n) => new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', minimumFractionDigits: 0
   }).format(n || 0)
 
   // Header
-  doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-  doc.text(negocio, 14, 20)
+  const logo = await cargarLogoDataUrl()
+  doc.addImage(logo, 'PNG', 14, 8, 24, 18)
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+  doc.text(negocio, 42, 20)
   doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-  doc.text('Almacén de repuestos y taller automotriz', 14, 27)
+  doc.text('Almacén y servicios eléctricos', 42, 27)
   doc.line(14, 32, 196, 32)
 
   // Info factura
