@@ -1,0 +1,1 @@
+export const NOMBRE_NEGOCIO = 'Almacén y Servicios Eléctricos DB'

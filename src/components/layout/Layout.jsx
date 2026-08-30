@@ -14,6 +14,7 @@ import useAuthStore from '../../store/authStore'
 import Compras from '../../pages/compras/Compras'
 import Categorias from '../../pages/inventario/Categorias'
 import DashboardCajera from '../../pages/dashboard/DashboardCajera'
+import Backup from '../../pages/administracion/Backup'
 
 export default function Layout() {
   const usuario = useAuthStore((s) => s.usuario)
@@ -36,6 +37,7 @@ export default function Layout() {
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/compras" element={<Compras />} />
           <Route path="/categorias" element={<Categorias />} />
+          <Route path="/backup" element={<Backup />} />
         </Routes>
       </main>
     </div>

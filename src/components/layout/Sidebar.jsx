@@ -11,9 +11,9 @@ import {
   DollarSign,
   BarChart3,
   LogOut,
-  Car,
   Truck,
   Tag,
+  DatabaseZap,
 } from 'lucide-react'
 
 const NAV_DUENO = [
@@ -27,6 +27,7 @@ const NAV_DUENO = [
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
   { to: '/compras', icon: Truck, label: 'Compras' },
   { to: '/categorias', icon: Tag, label: 'Categorías' },
+  { to: '/backup', icon: DatabaseZap, label: 'Copias de seguridad' },
 ]
 
 const NAV_CAJERA = [
@@ -70,12 +71,10 @@ export default function Sidebar() {
     <aside className="w-64 bg-gray-900 text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-lg">
-            <Car size={24} />
-          </div>
+          <img src="/logo-db.png" alt="Logo" className="w-10 h-10 object-contain flex-shrink-0" />
           <div>
-            <h1 className="font-bold text-lg leading-tight">SGI-AUTO</h1>
-            <p className="text-xs text-gray-400">Sistema de Gestión</p>
+            <h1 className="font-bold text-sm leading-tight">Almacén y Servicios</h1>
+            <h1 className="font-bold text-sm leading-tight">Eléctricos DB</h1>
           </div>
         </div>
       </div>

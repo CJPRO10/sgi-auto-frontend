@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { login } from '../../api/auth'
 import useAuthStore from '../../store/authStore'
-import { Car } from 'lucide-react'
+import { NOMBRE_NEGOCIO } from '../../utils/marca'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -46,10 +46,8 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-            <Car size={32} className="text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">SGI-AUTO</h1>
+          <img src="/logo-db.png" alt={NOMBRE_NEGOCIO} className="w-24 h-24 object-contain mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-white">{NOMBRE_NEGOCIO}</h1>
           <p className="text-gray-400 mt-1">Sistema de Gestión Integral</p>
         </div>
 
@@ -107,7 +105,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-gray-500 text-sm mt-6">
-          SGI-AUTO © 2026
+          {NOMBRE_NEGOCIO} © 2026
         </p>
       </div>
     </div>
