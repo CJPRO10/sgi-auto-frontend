@@ -1,13 +1,42 @@
-import { useQuery } from '@tanstack/react-query'
-import { getVentaPorId } from '../../api/pos'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getVentaPorId, anularVenta } from '../../api/pos'
 import { formatCOP, formatFecha } from '../../utils/formato'
-import { X, Package, ShoppingCart } from 'lucide-react'
+import { X, Package, ShoppingCart, AlertTriangle } from 'lucide-react'
+import useAuthStore from '../../store/authStore'
 
 export default function ModalDetalleVenta({ ventaId, onClose }) {
+  const queryClient = useQueryClient()
+  const usuario = useAuthStore((s) => s.usuario)
+  const esDueno = usuario?.rol === 'DUENO'
+
+  const [confirmandoAnulacion, setConfirmandoAnulacion] = useState(false)
+  const [razon, setRazon] = useState('')
+  const [error, setError] = useState('')
+
   const { data: venta, isLoading } = useQuery({
     queryKey: ['venta-detalle', ventaId],
     queryFn: () => getVentaPorId(ventaId).then((r) => r.data.datos),
   })
+
+  const { mutate: anular, isPending: anulando } = useMutation({
+    mutationFn: () => anularVenta(ventaId, razon),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['venta-detalle', ventaId])
+      queryClient.invalidateQueries(['caja-actual'])
+      queryClient.invalidateQueries(['historial-caja'])
+      queryClient.invalidateQueries(['reporte-ventas'])
+      setConfirmandoAnulacion(false)
+      setRazon('')
+      setError('')
+    },
+    onError: (err) => setError(err.response?.data?.mensaje || 'Error al anular la venta'),
+  })
+
+  const handleAnular = () => {
+    if (!razon.trim()) { setError('La razón es obligatoria'); return }
+    anular()
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
@@ -16,9 +45,7 @@ export default function ModalDetalleVenta({ ventaId, onClose }) {
           <div className="flex items-center gap-2">
             <ShoppingCart size={18} className="text-blue-600" />
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">
-                Venta #{ventaId}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-800">Venta #{ventaId}</h2>
               {venta && <p className="text-sm text-gray-400">{formatFecha(venta.creadoEn)}</p>}
             </div>
           </div>
@@ -34,6 +61,14 @@ export default function ModalDetalleVenta({ ventaId, onClose }) {
             </div>
           ) : venta && (
             <>
+              {/* Estado anulada */}
+              {venta.estado === 'ANULADA' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                  <p className="font-semibold mb-1">⚠️ Venta anulada</p>
+                  {venta.razonAnulacion && <p>{venta.razonAnulacion}</p>}
+                </div>
+              )}
+
               {/* Info general */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -62,9 +97,7 @@ export default function ModalDetalleVenta({ ventaId, onClose }) {
 
               {/* Productos */}
               <div>
-                <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Productos vendidos
-                </p>
+                <p className="text-sm font-semibold text-gray-600 mb-2">Productos vendidos</p>
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
@@ -118,6 +151,53 @@ export default function ModalDetalleVenta({ ventaId, onClose }) {
                   </div>
                 )}
               </div>
+
+              {/* Botón anular — solo dueño y solo si está completada */}
+              {esDueno && venta.estado === 'COMPLETADA' && !confirmandoAnulacion && (
+                <button
+                  onClick={() => setConfirmandoAnulacion(true)}
+                  className="w-full py-2 border border-red-300 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                  <AlertTriangle size={15} />
+                  Anular venta
+                </button>
+              )}
+
+              {/* Formulario confirmación anulación */}
+              {confirmandoAnulacion && (
+                <div className="border border-red-200 rounded-lg p-4 space-y-3 bg-red-50">
+                  <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                    <AlertTriangle size={15} />
+                    Confirmar anulación
+                  </p>
+                  <p className="text-xs text-red-600">
+                    Se reintegrará el stock de todos los productos. Esta acción no se puede deshacer.
+                  </p>
+                  <textarea
+                    value={razon}
+                    onChange={(e) => setRazon(e.target.value)}
+                    placeholder="Razón de la anulación..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none bg-white"
+                  />
+                  {error && <p className="text-red-600 text-xs">{error}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setConfirmandoAnulacion(false); setRazon(''); setError('') }}
+                      className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-white"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleAnular}
+                      disabled={anulando}
+                      className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                      {anulando ? 'Anulando...' : 'Confirmar'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
